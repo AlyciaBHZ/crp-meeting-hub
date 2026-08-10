@@ -53,5 +53,5 @@
 - [x] Document local setup, free hosting architecture, privacy boundaries, and future Supabase configuration.
 - [x] Run `npm test` and `npm run build` and require zero failures.
 - [x] Inspect the production diff and ensure no secrets or uploaded files are tracked.
-- [ ] Commit the repository on `main`.
+- [x] Commit the repository on `main`.
 - [ ] Run `gh repo create crp-meeting-hub --public --source . --remote origin --push` after GitHub CLI authentication succeeds.
