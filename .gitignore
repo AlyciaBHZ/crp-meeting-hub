@@ -1,0 +1,15 @@
+node_modules/
+dist/
+output/
+.playwright-cli/
+.env
+.env.local
+*.local
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Uploaded research files must stay out of the public source repository.
+uploads/
+*.ppt
+*.pptx
