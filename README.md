@@ -1,6 +1,6 @@
 # CRP Meeting Hub
 
-A lightweight workspace for CRP grant meeting agendas, presentation slides, and post-meeting minutes. The initial screen contains the supplied six-group agenda and runs entirely as a local preview.
+A lightweight workspace for CRP grant meeting agendas, private presentation slides, member access, and post-meeting minutes. The hosted application uses Supabase Auth, PostgreSQL, and private Storage.
 
 ## Local Development
 
@@ -21,15 +21,18 @@ npm run build
 - Upcoming meeting summary with date and venue placeholders
 - Six presentation slots from 9:00 AM to 11:00 AM
 - 15-minute presentation and 5-minute Q&A format
-- Local file selection and validation for PDF, PPT, and PPTX slides up to 50 MB
-- Administrator-only meeting-minutes placeholder
+- Passwordless email sign-in for approved members
+- Private PDF, PPT, and PPTX slide uploads up to 50 MB
+- Private PDF, DOCX, and Markdown meeting-minutes uploads up to 50 MB
+- 60-second signed download links
+- Administrator member allowlist, presenter assignment, date, and venue controls
 - Responsive desktop and mobile layouts
 
-Selecting a file in this version does **not** upload it to a shared service. The interface says this explicitly. Shared uploads will be enabled only after private cloud storage and access controls are configured.
+Without local Supabase environment variables, the application intentionally runs in local-preview mode and does not claim to upload selected files.
 
 ## Free Hosting Architecture
 
-The frontend can be deployed from this repository on Vercel or Cloudflare Pages for free. The planned shared data layer is Supabase Free Tier:
+The frontend is deployed from this repository on Vercel. The shared data layer uses Supabase Free Tier:
 
 - Supabase Auth for presenter and administrator login
 - PostgreSQL for meetings, agenda slots, and file metadata
@@ -37,13 +40,26 @@ The frontend can be deployed from this repository on Vercel or Cloudflare Pages 
 - Row-level security so presenters can modify only their own slot
 - Short-lived signed URLs for downloads
 
-Copy `.env.example` to `.env.local` only after creating the Supabase project. Never commit credentials, attendee information, meeting files, or unpublished research data to this public repository.
+Copy `.env.example` to `.env.local` and use the Supabase project URL plus its publishable key. Never commit CLI tokens, service-role keys, attendee information, meeting files, or unpublished research data to this public repository.
+
+## Member Workflow
+
+1. An administrator signs in with an approved email.
+2. The administrator adds each team member email in **Members and assignments**.
+3. The member requests a secure sign-in link from the website and opens the email link.
+4. After that first sign-in, the administrator assigns the member to their presentation group.
+5. The presenter can upload or replace slides only for that assigned group.
+
+Visitors can see the schedule. Only approved signed-in members can see private resource metadata or download files. Storage objects use private buckets and short-lived signed URLs.
 
 ## Editing The Agenda
 
-Until the administrator interface is connected, edit `src/data/meeting.ts`. Meeting data is separate from page components so it can later be replaced by database records without redesigning the interface.
+The administrator edits the meeting date, venue, membership, and presenter assignments in the hosted application. `src/data/meeting.ts` remains the local-preview fallback.
+
+## Database Changes
+
+Versioned SQL migrations live in `supabase/migrations`. Local project-link data and administrator bootstrap values live under `supabase/.temp` and are ignored by Git.
 
 ## Repository Privacy
 
 The source code is designed to be public. Real slides and meeting minutes are not. `.gitignore` excludes local PowerPoint files and upload directories as an additional safeguard.
-

@@ -16,3 +16,13 @@ export function validateSlidesFile(file: File): string | null {
   return null
 }
 
+export function validateMinutesFile(file: File): string | null {
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (!extension || !new Set(['pdf', 'docx', 'md']).has(extension)) {
+    return 'Please choose a PDF, DOCX, or Markdown file.'
+  }
+  if (file.size > MAX_SLIDES_SIZE) {
+    return 'The file must be 50 MB or smaller.'
+  }
+  return null
+}

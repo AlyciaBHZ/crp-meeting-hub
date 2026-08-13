@@ -7,17 +7,22 @@ export interface AgendaSlot {
   groupName: string
   slideStatus: SlideStatus
   slideFileName?: string
+  slideObjectPath?: string
+  presenterId?: string
 }
 
 export interface Meeting {
   id: string
   title: string
   date?: string
+  dateISO?: string
   venue?: string
   timezone: string
   presentationMinutes: number
   qaMinutes: number
   slots: AgendaSlot[]
+  minutesFileName?: string
+  minutesObjectPath?: string
 }
 
 export const upcomingMeeting: Meeting = {
@@ -35,4 +40,3 @@ export const upcomingMeeting: Meeting = {
     { id: 'li-qi-jing', startsAt: '10:40', endsAt: '11:00', groupName: "Prof Li Qi Jing's group", slideStatus: 'awaiting' },
   ],
 }
-

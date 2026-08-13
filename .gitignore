@@ -15,3 +15,7 @@ uploads/
 *.pptx
 
 .vercel
+.gstack/
+supabase/.temp/
+
+.env*

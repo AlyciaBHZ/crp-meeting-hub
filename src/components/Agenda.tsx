@@ -1,4 +1,4 @@
-import { Check, Clock3, Upload } from 'lucide-react'
+import { Check, Clock3, Download, Upload } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { AgendaSlot, Meeting } from '../data/meeting'
 import { validateSlidesFile } from '../uploadValidation'
@@ -10,17 +10,39 @@ function formatTime(time: string) {
   return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`
 }
 
-function SlideUploadControl({ slot }: { slot: AgendaSlot }) {
+interface SlideUploadControlProps {
+  slot: AgendaSlot
+  enabled: boolean
+  cloudMode: boolean
+  onUpload?: (slot: AgendaSlot, file: File) => Promise<void>
+  onDownload?: (slot: AgendaSlot) => Promise<void>
+}
+
+function SlideUploadControl({ slot, enabled, cloudMode, onUpload, onDownload }: SlideUploadControlProps) {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [selection, setSelection] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  function handleFile(file?: File) {
+  const [pending, setPending] = useState(false)
+
+  async function handleFile(file?: File) {
     if (!file) return
     const validationError = validateSlidesFile(file)
     setError(validationError)
     setSelection(validationError ? null : file.name)
+    if (!validationError && onUpload) {
+      setPending(true)
+      try {
+        await onUpload(slot, file)
+        setSelection(`Uploaded: ${file.name}`)
+      } catch (uploadError) {
+        setSelection(null)
+        setError(uploadError instanceof Error ? uploadError.message : 'Upload failed.')
+      } finally {
+        setPending(false)
+      }
+    }
   }
 
   return (
@@ -31,20 +53,27 @@ function SlideUploadControl({ slot }: { slot: AgendaSlot }) {
         hidden
         type="file"
         accept=".pdf,.ppt,.pptx"
-        onChange={(event) => handleFile(event.target.files?.[0])}
+        onChange={(event) => void handleFile(event.target.files?.[0])}
       />
+      {slot.slideObjectPath && onDownload && (
+        <button className="download-button" type="button" onClick={() => void onDownload(slot)} aria-label={`Download slides for ${slot.groupName}`}>
+          <Download aria-hidden="true" size={17} /> Download
+        </button>
+      )}
       <button
         className="upload-button"
         type="button"
         onClick={() => inputRef.current?.click()}
         aria-label={`Upload slides for ${slot.groupName}`}
+        disabled={!enabled || pending}
+        title={!enabled && cloudMode ? 'Sign in with an assigned member account to upload.' : undefined}
       >
         <Upload aria-hidden="true" size={17} />
-        Upload slides
+        {pending ? 'Uploading...' : slot.slideStatus === 'uploaded' ? 'Replace slides' : 'Upload slides'}
       </button>
       {selection && (
         <p className="file-feedback selected" title={selection}>
-          <Check aria-hidden="true" size={14} /> Selected locally: {selection}
+          <Check aria-hidden="true" size={14} /> {cloudMode ? selection : `Selected locally: ${selection}`}
         </p>
       )}
       {error && <p className="file-feedback error" role="alert">{error}</p>}
@@ -54,9 +83,13 @@ function SlideUploadControl({ slot }: { slot: AgendaSlot }) {
 
 interface AgendaProps {
   meeting: Meeting
+  cloudMode?: boolean
+  canUpload?: (slot: AgendaSlot) => boolean
+  onUpload?: (slot: AgendaSlot, file: File) => Promise<void>
+  onDownload?: (slot: AgendaSlot) => Promise<void>
 }
 
-export function Agenda({ meeting }: AgendaProps) {
+export function Agenda({ meeting, cloudMode = false, canUpload = () => true, onUpload, onDownload }: AgendaProps) {
   return (
     <section className="agenda-section" aria-labelledby="agenda-heading">
       <div className="section-heading">
@@ -85,7 +118,13 @@ export function Agenda({ meeting }: AgendaProps) {
                 {slot.slideStatus === 'uploaded' ? 'Slides ready' : 'Awaiting slides'}
               </span>
             </div>
-            <SlideUploadControl slot={slot} />
+            <SlideUploadControl
+              slot={slot}
+              enabled={canUpload(slot)}
+              cloudMode={cloudMode}
+              onUpload={onUpload}
+              onDownload={onDownload}
+            />
           </li>
         ))}
       </ol>
