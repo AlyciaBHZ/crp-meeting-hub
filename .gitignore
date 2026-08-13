@@ -13,3 +13,5 @@ output/
 uploads/
 *.ppt
 *.pptx
+
+.vercel
