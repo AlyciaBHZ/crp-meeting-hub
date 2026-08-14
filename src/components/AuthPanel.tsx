@@ -1,6 +1,6 @@
 import { KeyRound, LogIn, LogOut, Mail } from 'lucide-react'
 import { FormEvent, useState } from 'react'
-import { displayLoginIdentity } from '../services/loginIdentity'
+import { displayLoginIdentity, isSharedLogin } from '../services/loginIdentity'
 
 interface AuthPanelProps {
   user: { email?: string } | null
@@ -24,6 +24,7 @@ export function AuthPanel({
   const [message, setMessage] = useState<string | null>(null)
   const [pending, setPending] = useState<'sign-in' | 'link' | 'password' | null>(null)
   const [changingPassword, setChangingPassword] = useState(false)
+  const sharedUser = isSharedLogin(displayLoginIdentity(user?.email))
 
   async function signIn(event: FormEvent) {
     event.preventDefault()
@@ -71,7 +72,7 @@ export function AuthPanel({
     }
   }
 
-  if (user && (needsPasswordSetup || changingPassword)) {
+  if (user && !sharedUser && (needsPasswordSetup || changingPassword)) {
     return (
       <form className="password-form" onSubmit={savePassword}>
         <label htmlFor="new-password">New password</label>
@@ -99,9 +100,11 @@ export function AuthPanel({
     return (
       <div className="auth-member">
         <span>{displayLoginIdentity(user.email)}</span>
-        <button className="quiet-button" type="button" onClick={() => setChangingPassword(true)} aria-label="Change password">
-          <KeyRound aria-hidden="true" size={16} />
-        </button>
+        {!sharedUser && (
+          <button className="quiet-button" type="button" onClick={() => setChangingPassword(true)} aria-label="Change password">
+            <KeyRound aria-hidden="true" size={16} />
+          </button>
+        )}
         <button className="quiet-button" type="button" onClick={() => void onSignOut()} aria-label="Sign out">
           <LogOut aria-hidden="true" size={16} />
         </button>

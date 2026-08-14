@@ -61,4 +61,12 @@ describe('AuthPanel', () => {
     expect(screen.getByRole('button', { name: 'Change password' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
+
+  it('does not let a shared account replace the centrally managed password', () => {
+    render(<AuthPanel {...baseProps} user={{ email: 'crpgrant@crp-meeting-hub.invalid' }} needsPasswordSetup={false} />)
+
+    expect(screen.getByText('crpgrant')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Change password' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  })
 })
