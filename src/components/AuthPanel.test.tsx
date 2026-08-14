@@ -15,18 +15,29 @@ describe('AuthPanel', () => {
     const onPasswordSignIn = vi.fn(() => Promise.resolve())
     render(<AuthPanel {...baseProps} user={null} needsPasswordSetup={false} onPasswordSignIn={onPasswordSignIn} />)
 
-    await userEvent.type(screen.getByLabelText('Email address'), 'Member@Example.com')
+    await userEvent.type(screen.getByLabelText('Username or email'), 'Member@Example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'correct horse battery staple')
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     expect(onPasswordSignIn).toHaveBeenCalledWith('member@example.com', 'correct horse battery staple')
   })
 
+  it('accepts the shared member username', async () => {
+    const onPasswordSignIn = vi.fn(() => Promise.resolve())
+    render(<AuthPanel {...baseProps} user={null} needsPasswordSetup={false} onPasswordSignIn={onPasswordSignIn} />)
+
+    await userEvent.type(screen.getByLabelText('Username or email'), 'crpgrant')
+    await userEvent.type(screen.getByLabelText('Password'), 'shared password')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(onPasswordSignIn).toHaveBeenCalledWith('crpgrant', 'shared password')
+  })
+
   it('sends a setup or reset link to the entered email', async () => {
     const onPasswordLink = vi.fn(() => Promise.resolve())
     render(<AuthPanel {...baseProps} user={null} needsPasswordSetup={false} onPasswordLink={onPasswordLink} />)
 
-    await userEvent.type(screen.getByLabelText('Email address'), 'member@example.com')
+    await userEvent.type(screen.getByLabelText('Username or email'), 'member@example.com')
     await userEvent.click(screen.getByRole('button', { name: 'Set up or reset password' }))
 
     expect(onPasswordLink).toHaveBeenCalledWith('member@example.com')

@@ -22,7 +22,7 @@ npm run build
 - Reusable research groups with approved group members
 - A different selection and order of presenting groups for every meeting
 - Exact start and end time controls for every agenda slot
-- Email and password sign-in for approved members
+- Shared username or personal email and password sign-in
 - Email-link password setup and reset flow
 - Private PDF, PPT, and PPTX slide uploads up to 50 MB
 - Private PDF, DOCX, and Markdown meeting-minutes uploads up to 50 MB
@@ -48,6 +48,10 @@ The frontend is deployed from this repository on Vercel. The shared data layer u
 Copy `.env.example` to `.env.local` and use the Supabase project URL plus its publishable key. Never commit CLI tokens, service-role keys, attendee information, meeting files, or unpublished research data to this public repository.
 
 ## Member Workflow
+
+The small CRP team may use centrally managed shared usernames. These aliases resolve to private Supabase Auth identities in the application; their passwords are configured directly in Supabase and are never committed to the repository.
+
+For individual accounts:
 
 1. An administrator adds a team member's email under **Members and access**.
 2. The member uses **Set up or reset password** and opens the link sent by Supabase.

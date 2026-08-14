@@ -7,6 +7,7 @@ import { MeetingCollection } from './components/MeetingCollection'
 import type { AgendaSlot, Meeting, MeetingDraft, ResearchGroup } from './data/meeting'
 import { upcomingMeeting } from './data/meeting'
 import type { MemberProfile } from './services/meetingAccess'
+import { isSharedLogin, resolveLoginIdentity } from './services/loginIdentity'
 import { getSingaporeTodayISO, type MeetingView } from './services/meetingLifecycle'
 import { createMeetingRepository } from './services/meetingRepository'
 import { isSupabaseConfigured, supabase } from './services/supabaseClient'
@@ -76,14 +77,17 @@ export default function App() {
     return () => data.subscription.unsubscribe()
   }, [hydrateSession, loadGroups, loadMeetings, repository])
 
-  async function signInWithPassword(email: string, password: string) {
+  async function signInWithPassword(identity: string, password: string) {
     if (!supabase) throw new Error('Cloud sign-in is not configured.')
+    const email = resolveLoginIdentity(identity)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
   }
 
-  async function sendPasswordLink(email: string) {
+  async function sendPasswordLink(identity: string) {
     if (!supabase) throw new Error('Cloud sign-in is not configured.')
+    if (isSharedLogin(identity)) throw new Error('Shared account passwords are managed by the CRP administrator.')
+    const email = resolveLoginIdentity(identity)
     const redirect = new URL(window.location.origin)
     redirect.searchParams.set('password_setup', '1')
     const { error } = await supabase.auth.signInWithOtp({

@@ -1,5 +1,6 @@
 import { KeyRound, LogIn, LogOut, Mail } from 'lucide-react'
 import { FormEvent, useState } from 'react'
+import { displayLoginIdentity } from '../services/loginIdentity'
 
 interface AuthPanelProps {
   user: { email?: string } | null
@@ -97,7 +98,7 @@ export function AuthPanel({
   if (user) {
     return (
       <div className="auth-member">
-        <span>{user.email}</span>
+        <span>{displayLoginIdentity(user.email)}</span>
         <button className="quiet-button" type="button" onClick={() => setChangingPassword(true)} aria-label="Change password">
           <KeyRound aria-hidden="true" size={16} />
         </button>
@@ -111,15 +112,15 @@ export function AuthPanel({
 
   return (
     <form className="auth-form" onSubmit={signIn}>
-      <label htmlFor="member-email">Email address</label>
+      <label htmlFor="member-email">Username or email</label>
       <input
         id="member-email"
-        type="email"
+        type="text"
         required
-        autoComplete="email"
+        autoComplete="username"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        placeholder="name@institution.edu"
+        placeholder="Username or email"
       />
       <label htmlFor="member-password">Password</label>
       <input
