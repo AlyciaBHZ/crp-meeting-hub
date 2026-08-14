@@ -6,21 +6,91 @@ function queryResult<T>(data: T) {
     select: vi.fn(() => chain),
     order: vi.fn(() => Promise.resolve({ data, error: null })),
     eq: vi.fn(() => chain),
+    not: vi.fn(() => chain),
     single: vi.fn(() => Promise.resolve({ data, error: null })),
   }
   return chain
 }
 
 describe('meetingRepository', () => {
-  it('loads the upcoming meeting and ordered agenda slots', async () => {
-    const meeting = { id: 'meeting-1', title: 'CRP Grant Meeting' }
-    const slots = [{ id: 'slot-1', starts_at: '09:00:00' }]
-    const from = vi.fn((table: string) => table === 'meetings' ? queryResult(meeting) : queryResult(slots))
+  it('loads and classifies all dated meetings with private member details', async () => {
+    const meetings = [
+      { id: 'past', title: 'CRP Grant Meeting', meeting_date: '2026-06-14', timezone: 'Asia/Singapore', presentation_minutes: 15, qa_minutes: 5 },
+      { id: 'future', title: 'CRP Grant Meeting', meeting_date: '2026-10-14', timezone: 'Asia/Singapore', presentation_minutes: 15, qa_minutes: 5 },
+    ]
+    const slots = [
+      { id: 'slot-past', meeting_id: 'past', group_id: 'group-1', group_name: 'Group 1', starts_at: '09:00', ends_at: '09:20', resources: [] },
+      { id: 'slot-future', meeting_id: 'future', group_id: 'group-1', group_name: 'Group 1', starts_at: '09:00', ends_at: '09:20', resources: [] },
+    ]
+    const rows = {
+      meetings,
+      agenda_slots: slots,
+      resources: [],
+      meeting_private_details: [{ meeting_id: 'future', zoom_url: 'https://zoom.us/j/123' }],
+      group_members: [{ group_id: 'group-1', profile_id: 'member-1' }],
+    } as Record<string, unknown[]>
+    const from = vi.fn((table: string) => queryResult(rows[table]))
     const repository = createMeetingRepository({ from } as never)
 
-    await expect(repository.getUpcomingMeeting()).resolves.toEqual({ meeting, slots, minutes: null })
+    await expect(repository.getMeetings('2026-08-14')).resolves.toEqual(expect.objectContaining({
+      upcoming: [expect.objectContaining({ id: 'future', zoomUrl: 'https://zoom.us/j/123' })],
+      archive: [expect.objectContaining({ id: 'past' })],
+    }))
     expect(from).toHaveBeenCalledWith('meetings')
     expect(from).toHaveBeenCalledWith('agenda_slots')
+    expect(from).toHaveBeenCalledWith('meeting_private_details')
+  })
+
+  it('creates complete meetings through the transactional database function', async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: 'meeting-2', error: null }))
+    const repository = createMeetingRepository({ rpc } as never)
+
+    await expect(repository.createMeeting({
+      date: '2026-10-14',
+      zoomUrl: 'https://zoom.us/j/123',
+      slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 }],
+    })).resolves.toBe('meeting-2')
+
+    expect(rpc).toHaveBeenCalledWith('create_meeting_with_slots', {
+      meeting_date_input: '2026-10-14',
+      zoom_url_input: 'https://zoom.us/j/123',
+      slots_input: [{ group_id: 'group-1', starts_at: '09:00', ends_at: '09:20', sort_order: 1 }],
+    })
+  })
+
+  it('updates an existing meeting and its schedule transactionally', async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: 'meeting-1', error: null }))
+    const repository = createMeetingRepository({ rpc } as never)
+    const draft = {
+      date: '2026-10-15', zoomUrl: 'https://zoom.us/j/new',
+      slots: [{ id: 'slot-1', groupId: 'group-1', groupName: 'Group 1', startsAt: '10:00', endsAt: '10:20', sortOrder: 1 }],
+    }
+
+    await expect(repository.updateMeetingSchedule('meeting-1', draft)).resolves.toBe('meeting-1')
+    expect(rpc).toHaveBeenCalledWith('update_meeting_with_slots', {
+      meeting_id_input: 'meeting-1',
+      meeting_date_input: '2026-10-15',
+      zoom_url_input: 'https://zoom.us/j/new',
+      slots_input: [{ slot_id: 'slot-1', group_id: 'group-1', starts_at: '10:00', ends_at: '10:20', sort_order: 1 }],
+    })
+  })
+
+  it('creates groups and updates group membership idempotently', async () => {
+    const insert = vi.fn(() => Promise.resolve({ error: null }))
+    const upsert = vi.fn(() => Promise.resolve({ error: null }))
+    const deleteResult = { eq: vi.fn() }
+    deleteResult.eq.mockReturnValueOnce(deleteResult).mockReturnValueOnce(Promise.resolve({ error: null }))
+    const remove = vi.fn(() => deleteResult)
+    const from = vi.fn((table: string) => table === 'groups' ? { insert } : { upsert, delete: remove })
+    const repository = createMeetingRepository({ from } as never)
+
+    await repository.createGroup('  New Group  ')
+    await repository.setGroupMember('group-1', 'member-1', true)
+    await repository.setGroupMember('group-1', 'member-1', false)
+
+    expect(insert).toHaveBeenCalledWith({ name: 'New Group' })
+    expect(upsert).toHaveBeenCalledWith({ group_id: 'group-1', profile_id: 'member-1' })
+    expect(remove).toHaveBeenCalled()
   })
 
   it('uploads slides into the private slides bucket and records metadata', async () => {
@@ -49,21 +119,13 @@ describe('meetingRepository', () => {
     expect(createSignedUrl).toHaveBeenCalledWith('slot-1/slides.pdf', 60)
   })
 
-  it('adds approved members and assigns a presenter to an agenda slot', async () => {
+  it('adds an approved member using a normalized email address', async () => {
     const insert = vi.fn(() => Promise.resolve({ error: null }))
-    const updateChain = { eq: vi.fn(() => Promise.resolve({ error: null })) }
-    const update = vi.fn(() => updateChain)
-    const client = {
-      from: vi.fn((table: string) => table === 'member_allowlist' ? { insert } : { update }),
-    }
-    const repository = createMeetingRepository(client as never)
+    const repository = createMeetingRepository({ from: vi.fn(() => ({ insert })) } as never)
 
     await repository.addMember('Presenter@Example.com', 'presenter')
-    await repository.assignPresenter('slot-1', 'member-1')
 
     expect(insert).toHaveBeenCalledWith({ email: 'presenter@example.com', role: 'presenter' })
-    expect(update).toHaveBeenCalledWith({ presenter_id: 'member-1' })
-    expect(updateChain.eq).toHaveBeenCalledWith('id', 'slot-1')
   })
 
   it('replaces meeting minutes metadata instead of creating duplicate records', async () => {
@@ -81,14 +143,4 @@ describe('meetingRepository', () => {
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ meeting_id: 'meeting-1', kind: 'minutes' }), { onConflict: 'kind,resource_scope' })
   })
 
-  it('updates the meeting date and venue', async () => {
-    const updateChain = { eq: vi.fn(() => Promise.resolve({ error: null })) }
-    const update = vi.fn(() => updateChain)
-    const repository = createMeetingRepository({ from: vi.fn(() => ({ update })) } as never)
-
-    await repository.updateMeeting('meeting-1', { meeting_date: '2026-09-01', venue: 'Seminar Room' })
-
-    expect(update).toHaveBeenCalledWith({ meeting_date: '2026-09-01', venue: 'Seminar Room' })
-    expect(updateChain.eq).toHaveBeenCalledWith('id', 'meeting-1')
-  })
 })

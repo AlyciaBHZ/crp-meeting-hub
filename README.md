@@ -1,6 +1,6 @@
 # CRP Meeting Hub
 
-A lightweight workspace for CRP grant meeting agendas, private presentation slides, member access, and post-meeting minutes. The hosted application uses Supabase Auth, PostgreSQL, and private Storage.
+A small, reusable workspace for recurring online CRP grant meetings. Administrators schedule each meeting and choose its presenters; approved group members upload slides, and administrators upload minutes. The hosted application uses Supabase Auth, PostgreSQL, and private Storage.
 
 ## Local Development
 
@@ -18,14 +18,18 @@ npm run build
 
 ## Current Scope
 
-- Upcoming meeting summary with date and venue placeholders
-- Six presentation slots from 9:00 AM to 11:00 AM
-- 15-minute presentation and 5-minute Q&A format
-- Passwordless email sign-in for approved members
+- Multiple upcoming meetings, each with its own date and private Zoom link
+- Reusable research groups with approved group members
+- A different selection and order of presenting groups for every meeting
+- Exact start and end time controls for every agenda slot
+- Email and password sign-in for approved members
+- Email-link password setup and reset flow
 - Private PDF, PPT, and PPTX slide uploads up to 50 MB
 - Private PDF, DOCX, and Markdown meeting-minutes uploads up to 50 MB
 - 60-second signed download links
-- Administrator member allowlist, presenter assignment, date, and venue controls
+- Automatic archive placement based on the Singapore calendar date
+- Slide and minutes replacement before or after a meeting moves to Archive
+- Administrator controls for meetings, groups, memberships, and administrator access
 - Responsive desktop and mobile layouts
 
 Without local Supabase environment variables, the application intentionally runs in local-preview mode and does not claim to upload selected files.
@@ -34,27 +38,30 @@ Without local Supabase environment variables, the application intentionally runs
 
 The frontend is deployed from this repository on Vercel. The shared data layer uses Supabase Free Tier:
 
-- Supabase Auth for presenter and administrator login
-- PostgreSQL for meetings, agenda slots, and file metadata
+- Supabase Auth for member and administrator login
+- PostgreSQL for meetings, reusable groups, agenda slots, and file metadata
 - Private Storage buckets for slides and minutes
-- Row-level security so presenters can modify only their own slot
+- Row-level security so group members can modify only their group's slides
+- A private meeting-details table so public visitors never receive Zoom links
 - Short-lived signed URLs for downloads
 
 Copy `.env.example` to `.env.local` and use the Supabase project URL plus its publishable key. Never commit CLI tokens, service-role keys, attendee information, meeting files, or unpublished research data to this public repository.
 
 ## Member Workflow
 
-1. An administrator signs in with an approved email.
-2. The administrator adds each team member email in **Members and assignments**.
-3. The member requests a secure sign-in link from the website and opens the email link.
-4. After that first sign-in, the administrator assigns the member to their presentation group.
-5. The presenter can upload or replace slides only for that assigned group.
+1. An administrator adds a team member's email under **Members and access**.
+2. The member uses **Set up or reset password** and opens the link sent by Supabase.
+3. The member chooses a password and subsequently signs in with email and password.
+4. The administrator assigns the activated member to one or more research groups.
+5. The member can upload or replace slides for those groups whenever they are scheduled.
 
-Visitors can see the schedule. Only approved signed-in members can see private resource metadata or download files. Storage objects use private buckets and short-lived signed URLs.
+Visitors can see meeting dates and agendas. Only approved signed-in members can see Zoom links, private resource metadata, or download files. Storage objects use private buckets and short-lived signed URLs.
 
-## Editing The Agenda
+## Administrator Workflow
 
-The administrator edits the meeting date, venue, membership, and presenter assignments in the hosted application. `src/data/meeting.ts` remains the local-preview fallback.
+Administrators create a meeting by choosing a date, entering its Zoom URL, selecting the groups presenting in that meeting, ordering them, and setting exact start and end times. Existing upcoming meetings can be edited in the same workspace. A meeting moves to **Archive** automatically after its date; there is no manual archive action or upload-completeness requirement.
+
+Administrators can also add or rename research groups, deactivate groups that are no longer in use, assign activated members to groups, approve new presenters, and add additional administrators. `src/data/meeting.ts` remains the local-preview fallback when Supabase environment variables are absent.
 
 ## Database Changes
 

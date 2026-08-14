@@ -1,5 +1,5 @@
 import { Download, FileText, LockKeyhole, Upload } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { Meeting } from '../data/meeting'
 import { validateMinutesFile } from '../uploadValidation'
 
@@ -11,6 +11,7 @@ interface ResourcesProps {
 }
 
 export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: ResourcesProps) {
+  const headingId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -35,11 +36,11 @@ export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: Re
   }
 
   return (
-    <section className="resources-section" aria-labelledby="resources-heading">
+    <section className="resources-section" aria-labelledby={headingId}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">After the meeting</p>
-          <h2 id="resources-heading">Meeting records</h2>
+          <h2 id={headingId}>Meeting records</h2>
         </div>
       </div>
 

@@ -6,9 +6,9 @@ export interface MemberProfile {
   email?: string
 }
 
-export function canManageSlot(profile: MemberProfile | null, slot: { presenter_id?: string | null; presenterId?: string }) {
+export function canManageSlot(profile: MemberProfile | null, slot: { groupMemberIds?: string[] }) {
   if (!profile) return false
-  return profile.role === 'admin' || (slot.presenter_id ?? slot.presenterId) === profile.id
+  return profile.role === 'admin' || Boolean(slot.groupMemberIds?.includes(profile.id))
 }
 
 function formatDate(date?: string | null) {
@@ -21,6 +21,8 @@ export function mapCloudMeeting(
   meeting: Record<string, unknown>,
   slots: Array<Record<string, unknown>>,
   minutes?: Record<string, unknown> | null,
+  privateDetails?: Record<string, unknown> | null,
+  groupMemberIds: Record<string, string[]> = {},
 ): Meeting {
   return {
     id: String(meeting.id),
@@ -33,6 +35,7 @@ export function mapCloudMeeting(
     qaMinutes: Number(meeting.qa_minutes),
     minutesFileName: minutes?.original_name ? String(minutes.original_name) : undefined,
     minutesObjectPath: minutes?.object_path ? String(minutes.object_path) : undefined,
+    zoomUrl: privateDetails?.zoom_url ? String(privateDetails.zoom_url) : undefined,
     slots: slots.map((slot) => {
       const resources = (slot.resources ?? []) as Array<Record<string, unknown>>
       const slides = resources.find((resource) => resource.kind === 'slides') ?? resources[0]
@@ -42,6 +45,8 @@ export function mapCloudMeeting(
         endsAt: String(slot.ends_at).slice(0, 5),
         groupName: String(slot.group_name),
         presenterId: slot.presenter_id ? String(slot.presenter_id) : undefined,
+        groupId: slot.group_id ? String(slot.group_id) : undefined,
+        groupMemberIds: slot.group_id ? (groupMemberIds[String(slot.group_id)] ?? []) : [],
         slideStatus: slides ? 'uploaded' : 'awaiting',
         slideFileName: slides?.original_name ? String(slides.original_name) : undefined,
         slideObjectPath: slides?.object_path ? String(slides.object_path) : undefined,

@@ -6,9 +6,9 @@ describe('CRP Meeting Hub', () => {
   it('shows the upcoming meeting and supplied agenda', () => {
     const { container } = render(<App />)
 
-    expect(screen.getByRole('heading', { level: 1, name: 'CRP Grant Meeting' })).toBeInTheDocument()
-    expect(screen.getByText('15 min presentation')).toBeInTheDocument()
-    expect(screen.getByText('5 min Q&A')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Upcoming meetings' })).toBeInTheDocument()
+    expect(screen.getAllByText(/15 min presentation/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/5 min Q&A/).length).toBeGreaterThan(0)
     expect(screen.getByText("Prof Zhang Yang's group")).toBeInTheDocument()
     expect(screen.getByText("Prof Li Qi Jing's group")).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /upload slides for/i })).toHaveLength(6)

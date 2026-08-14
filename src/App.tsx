@@ -1,152 +1,201 @@
 import type { User } from '@supabase/supabase-js'
-import { Cloud, CloudOff, FolderKanban } from 'lucide-react'
+import { Archive, CalendarDays, Cloud, CloudOff, FolderKanban } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Agenda } from './components/Agenda'
-import { AdminPanel } from './components/AdminPanel'
+import { AdminPanel, type ProfileRecord } from './components/AdminPanel'
 import { AuthPanel } from './components/AuthPanel'
-import { MeetingSummary } from './components/MeetingSummary'
-import { Resources } from './components/Resources'
-import type { AgendaSlot, Meeting } from './data/meeting'
+import { MeetingCollection } from './components/MeetingCollection'
+import type { AgendaSlot, Meeting, MeetingDraft, ResearchGroup } from './data/meeting'
 import { upcomingMeeting } from './data/meeting'
-import { canManageSlot, mapCloudMeeting, type MemberProfile } from './services/meetingAccess'
+import type { MemberProfile } from './services/meetingAccess'
+import { getSingaporeTodayISO, type MeetingView } from './services/meetingLifecycle'
 import { createMeetingRepository } from './services/meetingRepository'
 import { isSupabaseConfigured, supabase } from './services/supabaseClient'
 
+const localGroups: ResearchGroup[] = upcomingMeeting.slots.map((slot, index) => ({
+  id: `local-group-${index + 1}`,
+  name: slot.groupName,
+  active: true,
+  memberIds: [],
+}))
+
 export default function App() {
-  const [meeting, setMeeting] = useState<Meeting>(upcomingMeeting)
+  const [meetings, setMeetings] = useState<{ upcoming: Meeting[]; archive: Meeting[] }>({
+    upcoming: isSupabaseConfigured ? [] : [upcomingMeeting],
+    archive: [],
+  })
+  const [view, setView] = useState<MeetingView>('upcoming')
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<MemberProfile | null>(null)
+  const [groups, setGroups] = useState<ResearchGroup[]>(isSupabaseConfigured ? [] : localGroups)
+  const [profiles, setProfiles] = useState<ProfileRecord[]>([])
   const [cloudError, setCloudError] = useState<string | null>(null)
-  const [profiles, setProfiles] = useState<Array<{ id: string; email: string; display_name?: string | null; role: 'presenter' | 'admin' }>>([])
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(
+    () => new URLSearchParams(window.location.search).get('password_setup') === '1',
+  )
   const repository = useMemo(() => supabase ? createMeetingRepository(supabase) : null, [])
 
-  const loadMeeting = useCallback(async () => {
+  const loadMeetings = useCallback(async () => {
     if (!repository) return
     try {
-      const result = await repository.getUpcomingMeeting()
-      setMeeting(mapCloudMeeting(result.meeting, result.slots, result.minutes))
+      setMeetings(await repository.getMeetings(getSingaporeTodayISO()))
       setCloudError(null)
     } catch (error) {
-      setCloudError(error instanceof Error ? error.message : 'Unable to load the meeting workspace.')
+      setCloudError(error instanceof Error ? error.message : 'Unable to load meetings.')
     }
   }, [repository])
 
+  const loadGroups = useCallback(async () => {
+    if (!repository) return
+    try {
+      setGroups(await repository.getGroups())
+    } catch (error) {
+      setCloudError(error instanceof Error ? error.message : 'Unable to load groups.')
+    }
+  }, [repository])
+
+  const hydrateSession = useCallback(async (nextUser: User | null) => {
+    if (!repository) return
+    setUser(nextUser)
+    const nextProfile = nextUser ? await repository.getProfile(nextUser.id) : null
+    setProfile(nextProfile)
+    await Promise.all([loadMeetings(), loadGroups()])
+    if (nextProfile?.role === 'admin') {
+      setProfiles(await repository.getProfiles())
+    } else {
+      setProfiles([])
+    }
+  }, [loadGroups, loadMeetings, repository])
+
   useEffect(() => {
     if (!supabase || !repository) return
-    void loadMeeting()
-    void supabase.auth.getUser().then(async ({ data }) => {
-      setUser(data.user)
-      setProfile(data.user ? await repository.getProfile(data.user.id) : null)
-    })
+    void Promise.all([loadMeetings(), loadGroups()])
+    void supabase.auth.getUser().then(({ data }) => hydrateSession(data.user))
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      void (session?.user
-        ? repository.getProfile(session.user.id).then((nextProfile) => {
-            setProfile(nextProfile)
-            return loadMeeting()
-          })
-        : Promise.resolve(setProfile(null)))
+      window.setTimeout(() => void hydrateSession(session?.user ?? null), 0)
     })
     return () => data.subscription.unsubscribe()
-  }, [loadMeeting, repository])
+  }, [hydrateSession, loadGroups, loadMeetings, repository])
 
-  async function sendMagicLink(email: string) {
+  async function signInWithPassword(email: string, password: string) {
     if (!supabase) throw new Error('Cloud sign-in is not configured.')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }
+
+  async function sendPasswordLink(email: string) {
+    if (!supabase) throw new Error('Cloud sign-in is not configured.')
+    const redirect = new URL(window.location.origin)
+    redirect.searchParams.set('password_setup', '1')
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: redirect.toString(), shouldCreateUser: true },
     })
     if (error) throw error
   }
 
-  async function uploadSlides(slot: AgendaSlot, file: File) {
+  async function updatePassword(password: string) {
+    if (!supabase) throw new Error('Cloud sign-in is not configured.')
+    if (password.length < 10) throw new Error('Use at least 10 characters.')
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+    setNeedsPasswordSetup(false)
+    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+  }
+
+  async function uploadSlides(_meeting: Meeting, slot: AgendaSlot, file: File) {
     if (!repository || !user) throw new Error('Sign in before uploading slides.')
     await repository.uploadSlides(slot.id, user.id, file)
-    await loadMeeting()
+    await loadMeetings()
   }
 
   async function download(bucket: 'slides' | 'minutes', path?: string) {
     if (!repository || !path) return
-    const url = await repository.getDownloadUrl(bucket, path)
-    window.location.assign(url)
+    window.location.assign(await repository.getDownloadUrl(bucket, path))
   }
 
   const isAdmin = profile?.role === 'admin'
 
-  useEffect(() => {
-    if (isAdmin && repository) void repository.getProfiles().then(setProfiles)
-  }, [isAdmin, repository])
-
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="CRP Meeting Hub home">
+        <button className="brand" type="button" onClick={() => setView('upcoming')} aria-label="CRP Meeting Hub home">
           <span className="brand-mark"><FolderKanban aria-hidden="true" size={20} /></span>
           <span>CRP Meeting Hub</span>
-        </a>
-        <nav aria-label="Primary navigation">
-          <a className="active" href="#agenda">Upcoming</a>
-          <a href="#records">Records</a>
+        </button>
+        <nav aria-label="Meeting views">
+          <button className={view === 'upcoming' ? 'active' : ''} type="button" onClick={() => setView('upcoming')}>
+            <CalendarDays aria-hidden="true" size={16} /> Upcoming
+          </button>
+          <button className={view === 'archive' ? 'active' : ''} type="button" onClick={() => setView('archive')}>
+            <Archive aria-hidden="true" size={16} /> Archive
+          </button>
         </nav>
         <span className="access-label">{user ? 'Member workspace' : 'Internal workspace'}</span>
       </header>
 
       <main id="top">
-        <MeetingSummary meeting={meeting} />
         <div className={`configuration-notice ${isSupabaseConfigured ? 'cloud-ready' : ''}`} role="status">
           {isSupabaseConfigured ? <Cloud aria-hidden="true" size={18} /> : <CloudOff aria-hidden="true" size={18} />}
           <div className="cloud-copy">
-            <p>
-              <strong>{isSupabaseConfigured ? 'Private cloud workspace.' : 'Local preview.'}</strong>{' '}
-              {isSupabaseConfigured ? 'Sign in with an approved member email to upload and download files.' : 'Selected files stay on this device until private cloud storage is connected.'}
-            </p>
+            <p><strong>{isSupabaseConfigured ? 'Private member workspace.' : 'Local preview.'}</strong></p>
             {cloudError && <p className="cloud-error" role="alert">{cloudError}</p>}
-            {isSupabaseConfigured && user && !profile && <p className="cloud-error">This account is signed in but is not yet on the CRP member list.</p>}
+            {isSupabaseConfigured && user && !profile && <p className="cloud-error">This account is not on the CRP member list.</p>}
           </div>
           {isSupabaseConfigured && (
             <AuthPanel
               user={user}
-              onMagicLink={sendMagicLink}
+              needsPasswordSetup={needsPasswordSetup}
+              onPasswordSignIn={signInWithPassword}
+              onPasswordLink={sendPasswordLink}
+              onPasswordUpdate={updatePassword}
               onSignOut={async () => { await supabase?.auth.signOut() }}
             />
           )}
         </div>
-        <div id="agenda">
-          <Agenda
-            meeting={meeting}
-            cloudMode={isSupabaseConfigured}
-            canUpload={(slot) => !isSupabaseConfigured || canManageSlot(profile, slot)}
-            onUpload={isSupabaseConfigured ? uploadSlides : undefined}
-            onDownload={user && profile ? (slot) => download('slides', slot.slideObjectPath) : undefined}
-          />
-        </div>
-        <div id="records">
-          <Resources
-            meeting={meeting}
-            isAdmin={isAdmin}
-            onUpload={isAdmin && repository && user ? async (file) => {
-              await repository.uploadMinutes(meeting.id, user.id, file)
-              await loadMeeting()
-            } : undefined}
-            onDownload={user && profile && meeting.minutesObjectPath ? () => download('minutes', meeting.minutesObjectPath) : undefined}
-          />
-        </div>
+
+        <MeetingCollection
+          view={view}
+          meetings={meetings[view]}
+          profile={profile}
+          cloudMode={isSupabaseConfigured}
+          onUploadSlides={isSupabaseConfigured ? uploadSlides : undefined}
+          onDownloadSlides={user && profile ? (_meeting, slot) => download('slides', slot.slideObjectPath) : undefined}
+          onUploadMinutes={isAdmin && repository && user ? async (meeting, file) => {
+            await repository.uploadMinutes(meeting.id, user.id, file)
+            await loadMeetings()
+          } : undefined}
+          onDownloadMinutes={user && profile ? (meeting) => download('minutes', meeting.minutesObjectPath) : undefined}
+        />
+
         {isAdmin && repository && (
           <AdminPanel
-            meeting={meeting}
             profiles={profiles}
-            slots={meeting.slots}
+            groups={groups}
+            meetings={meetings.upcoming}
             onAddMember={async (email, role) => {
               await repository.addMember(email, role)
               setProfiles(await repository.getProfiles())
             }}
-            onAssign={async (slotId, presenterId) => {
-              await repository.assignPresenter(slotId, presenterId)
-              await loadMeeting()
+            onCreateMeeting={async (draft: MeetingDraft) => {
+              await repository.createMeeting(draft)
+              await loadMeetings()
+              setView('upcoming')
             }}
-            onUpdateMeeting={async (date, venue) => {
-              await repository.updateMeeting(meeting.id, { meeting_date: date || null, venue: venue || null })
-              await loadMeeting()
+            onUpdateMeeting={async (meetingId, draft) => {
+              await repository.updateMeetingSchedule(meetingId, draft)
+              await loadMeetings()
+            }}
+            onCreateGroup={async (name) => {
+              await repository.createGroup(name)
+              await loadGroups()
+            }}
+            onUpdateGroup={async (groupId, updates) => {
+              await repository.updateGroup(groupId, updates)
+              await loadGroups()
+            }}
+            onSetGroupMember={async (groupId, profileId, enabled) => {
+              await repository.setGroupMember(groupId, profileId, enabled)
+              await Promise.all([loadGroups(), loadMeetings()])
             }}
           />
         )}
@@ -154,7 +203,7 @@ export default function App() {
 
       <footer>
         <p>CRP Grant Collaboration</p>
-        <p>Singapore · Internal research use</p>
+        <p>Singapore | Internal research use</p>
       </footer>
     </div>
   )

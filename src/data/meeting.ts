@@ -9,6 +9,30 @@ export interface AgendaSlot {
   slideFileName?: string
   slideObjectPath?: string
   presenterId?: string
+  groupId?: string
+  groupMemberIds?: string[]
+}
+
+export interface ResearchGroup {
+  id: string
+  name: string
+  active: boolean
+  memberIds: string[]
+}
+
+export interface AgendaDraftSlot {
+  id?: string
+  groupId: string
+  groupName: string
+  startsAt: string
+  endsAt: string
+  sortOrder: number
+}
+
+export interface MeetingDraft {
+  date: string
+  zoomUrl: string
+  slots: AgendaDraftSlot[]
 }
 
 export interface Meeting {
@@ -23,6 +47,7 @@ export interface Meeting {
   slots: AgendaSlot[]
   minutesFileName?: string
   minutesObjectPath?: string
+  zoomUrl?: string
 }
 
 export const upcomingMeeting: Meeting = {

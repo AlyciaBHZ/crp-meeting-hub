@@ -90,12 +90,13 @@ interface AgendaProps {
 }
 
 export function Agenda({ meeting, cloudMode = false, canUpload = () => true, onUpload, onDownload }: AgendaProps) {
+  const headingId = useId()
   return (
-    <section className="agenda-section" aria-labelledby="agenda-heading">
+    <section className="agenda-section" aria-labelledby={headingId}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">Presentation order</p>
-          <h2 id="agenda-heading">Meeting agenda</h2>
+          <h2 id={headingId}>Meeting agenda</h2>
         </div>
         <p className="timezone"><Clock3 aria-hidden="true" size={16} /> Singapore time</p>
       </div>
@@ -110,7 +111,8 @@ export function Agenda({ meeting, cloudMode = false, canUpload = () => true, onU
             </time>
             <div className="agenda-group">
               <h3>{slot.groupName}</h3>
-              <p>{meeting.presentationMinutes} min presentation · {meeting.qaMinutes} min Q&amp;A</p>
+              {slot.slideFileName && <p className="slide-file-name">{slot.slideFileName}</p>}
+              <p>{meeting.presentationMinutes} min presentation / {meeting.qaMinutes} min Q&amp;A</p>
             </div>
             <div className="agenda-status">
               <span className={`status ${slot.slideStatus}`}>

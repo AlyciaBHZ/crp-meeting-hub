@@ -18,7 +18,7 @@ body {
   background: #f4f6f3;
 }
 
-button, input { font: inherit; letter-spacing: 0; }
+button, input, select { font: inherit; letter-spacing: 0; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 a { color: inherit; }
@@ -45,6 +45,10 @@ a { color: inherit; }
   font-weight: 720;
   gap: 10px;
   text-decoration: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 0;
 }
 
 .brand-mark {
@@ -58,17 +62,21 @@ a { color: inherit; }
   width: 36px;
 }
 
-nav { display: flex; gap: 28px; height: 68px; }
-nav a {
+nav { display: flex; gap: 8px; height: 68px; }
+nav button {
   align-items: center;
+  background: transparent;
+  border: 0;
   border-bottom: 2px solid transparent;
   color: #65716c;
   display: flex;
   font-size: 0.88rem;
   font-weight: 650;
+  gap: 7px;
+  padding: 0 12px;
   text-decoration: none;
 }
-nav a.active { border-color: #0b7054; color: #16201d; }
+nav button.active { border-color: #0b7054; color: #16201d; }
 
 .access-label {
   color: #69746f;
@@ -140,17 +148,40 @@ h1 { font-size: 3.5rem; line-height: 1.08; margin: 0; }
 .configuration-notice.cloud-ready { background: #e9f5ef; border-bottom-color: #bddccc; color: #165e48; }
 .cloud-copy { flex: 1; }
 .cloud-error { color: #a23b2b; margin-top: 5px !important; }
-.auth-form { align-items: center; display: grid; gap: 7px; grid-template-columns: auto minmax(190px, 260px) auto; }
-.auth-form label { font-size: 0.75rem; font-weight: 700; }
-.auth-form input { background: white; border: 1px solid #a9beb4; border-radius: 4px; height: 36px; padding: 0 10px; }
+.auth-form { align-items: center; display: grid; gap: 7px; grid-template-columns: minmax(170px, 230px) minmax(140px, 190px) auto; }
+.auth-form label { height: 1px; margin: -1px; overflow: hidden; position: absolute; width: 1px; clip-path: inset(50%); }
+.auth-form input, .password-form input { background: white; border: 1px solid #a9beb4; border-radius: 4px; height: 36px; min-width: 0; padding: 0 10px; }
+.password-link-button, .text-button { align-items: center; background: transparent; border: 0; color: #165e48; display: inline-flex; font-size: 0.72rem; font-weight: 700; gap: 6px; padding: 2px 0; }
+.password-link-button { grid-column: 1 / -1; justify-self: end; }
+.password-form { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; }
+.password-form label { font-size: 0.75rem; font-weight: 700; }
 .sign-in-button, .quiet-button, .download-button {
   align-items: center; border: 1px solid #0b7054; border-radius: 5px; display: inline-flex; font-size: 0.76rem;
   font-weight: 700; gap: 7px; justify-content: center; min-height: 36px; padding: 0 12px;
 }
 .sign-in-button { background: #0b7054; color: white; }
-.auth-message { grid-column: 2 / -1; }
+.auth-message { font-size: 0.72rem !important; grid-column: 1 / -1; }
 .auth-member { align-items: center; display: flex; font-size: 0.75rem; gap: 8px; }
 .quiet-button { background: white; color: #0b7054; height: 34px; min-height: 34px; padding: 0; width: 34px; }
+
+.meeting-collection { margin: 0 auto; max-width: 1280px; min-height: 420px; padding: 42px 5vw 76px; }
+.collection-heading { border-bottom: 1px solid #cfd8d3; margin-bottom: 30px; padding-bottom: 22px; }
+.collection-heading .eyebrow { color: #0b7054; }
+.collection-heading h1 { font-size: 2.2rem; line-height: 1.15; }
+.empty-state { background: white; border: 1px solid #dce2de; color: #69746f; margin: 0; padding: 34px 26px; }
+.meeting-entry { border-bottom: 1px solid #cfd8d3; margin-bottom: 56px; padding-bottom: 12px; }
+.meeting-entry:last-child { margin-bottom: 0; }
+.meeting-entry-header { align-items: center; background: #17322b; color: white; display: grid; gap: 26px; grid-template-columns: minmax(180px, 1fr) auto auto; padding: 24px 26px; }
+.meeting-sequence { color: #8ed4bc; font-size: 0.72rem; font-weight: 760; margin: 0 0 6px; text-transform: uppercase; }
+.meeting-entry-header h2 { font-size: 1.55rem; margin: 0; }
+.online-meeting-facts { display: flex; gap: 26px; margin: 0; }
+.online-meeting-facts dt { align-items: center; color: #9daca6; display: flex; font-size: 0.7rem; gap: 6px; margin-bottom: 5px; }
+.online-meeting-facts dd { font-size: 0.82rem; font-weight: 700; margin: 0; }
+.zoom-link { align-items: center; background: #f1c869; border: 1px solid #f1c869; border-radius: 5px; color: #2b2b21; display: inline-flex; font-size: 0.78rem; font-weight: 760; gap: 8px; min-height: 40px; padding: 0 14px; text-decoration: none; white-space: nowrap; }
+.meeting-entry .agenda-section, .meeting-entry .resources-section { margin: 0; max-width: none; padding-left: 0; padding-right: 0; }
+.meeting-entry .agenda-section { padding-top: 28px; }
+.meeting-entry .resources-section { padding-bottom: 42px; padding-top: 30px; }
+.slide-file-name { color: #0b7054 !important; font-weight: 700; margin-bottom: 5px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .agenda-section, .resources-section, .admin-section {
   margin: 0 auto;
@@ -202,7 +233,7 @@ h1 { font-size: 3.5rem; line-height: 1.08; margin: 0; }
 .upload-button:hover { background: #085c45; }
 .upload-button:disabled { background: #e7ebe8; border-color: #cbd2ce; color: #87918c; }
 .download-button { background: white; color: #0b7054; }
-.upload-button:focus-visible, .secondary-button:focus-visible, a:focus-visible { outline: 3px solid #f1c869; outline-offset: 3px; }
+.upload-button:focus-visible, .secondary-button:focus-visible, .icon-button:focus-visible, nav button:focus-visible, a:focus-visible { outline: 3px solid #f1c869; outline-offset: 3px; }
 .file-feedback { font-size: 0.69rem; margin: 0; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-feedback.selected { align-items: center; color: #0b7054; display: flex; gap: 3px; }
 .file-feedback.error { color: #a83b2c; }
@@ -226,12 +257,45 @@ h1 { font-size: 3.5rem; line-height: 1.08; margin: 0; }
 .resource-actions { display: flex; gap: 8px; }
 .resource-message { color: #0b7054 !important; margin-top: 5px !important; }
 
-.admin-section { padding-bottom: 60px; }
+.admin-section { border-top: 1px solid #cfd8d3; padding-bottom: 80px; padding-top: 48px; }
+.admin-workspace-section { border-top: 1px solid #dce2de; padding: 28px 0; }
+.admin-subheading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 18px; }
+.admin-subheading h3 { font-size: 1.1rem; margin: 0; }
+.admin-subheading .eyebrow { color: #0b7054; margin-bottom: 5px; }
+.member-count { align-items: center; color: #69746f; display: inline-flex; font-size: 0.75rem; gap: 6px; }
+.meeting-builder, .group-admin-list { background: white; border: 1px solid #dce2de; }
+.meeting-core-fields { align-items: end; display: grid; gap: 8px 12px; grid-template-columns: auto minmax(180px, 1fr) auto 170px auto minmax(260px, 1.4fr); padding: 20px 22px; }
+.meeting-core-fields label, .add-group-form label { font-size: 0.75rem; font-weight: 700; }
+.meeting-core-fields input, .meeting-core-fields select, .add-group-form input, .group-name-controls input, .agenda-draft-row input { background: white; border: 1px solid #c8d0cb; border-radius: 4px; height: 38px; min-width: 0; padding: 0 10px; }
+.group-picker { border: 0; border-top: 1px solid #e3e7e4; display: grid; gap: 10px 18px; grid-template-columns: repeat(3, minmax(180px, 1fr)); margin: 0; padding: 18px 22px 20px; }
+.group-picker legend { font-size: 0.75rem; font-weight: 760; padding: 18px 0 0; }
+.group-picker label, .group-member-options label { align-items: center; display: flex; font-size: 0.8rem; gap: 8px; min-width: 0; }
+.group-picker span, .group-member-options span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-builder { border-top: 1px solid #e3e7e4; }
+.agenda-draft-row { align-items: center; border-bottom: 1px solid #e3e7e4; display: grid; gap: 12px; grid-template-columns: 34px minmax(210px, 1fr) 138px 138px 116px; min-height: 70px; padding: 12px 22px; }
+.agenda-draft-row:last-child { border-bottom: 0; }
+.agenda-draft-order { color: #9aa49f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
+.agenda-draft-row > label { color: #69746f; display: grid; font-size: 0.68rem; gap: 4px; grid-template-columns: auto 1fr; }
+.agenda-draft-row > label input { width: 92px; }
+.row-tools { display: grid; gap: 4px; grid-template-columns: repeat(3, 36px); }
+.icon-button { align-items: center; background: white; border: 1px solid #c8d0cb; border-radius: 4px; color: #3d4a45; display: inline-flex; height: 36px; justify-content: center; padding: 0; width: 36px; }
+.icon-button:hover { border-color: #0b7054; color: #0b7054; }
+.icon-button:disabled { color: #aeb6b2; }
+.icon-button.danger { color: #a23b2b; }
+.form-command-row { align-items: center; border-top: 1px solid #e3e7e4; display: flex; gap: 14px; padding: 18px 22px; }
+.form-command-row .member-message { grid-column: auto; }
+.add-group-form { align-items: end; background: white; border: 1px solid #dce2de; border-bottom: 0; display: grid; gap: 8px 12px; grid-template-columns: auto minmax(240px, 1fr) auto; padding: 18px 22px; }
+.add-group-form .member-message { grid-column: 2 / -1; }
+.group-admin-row { border-bottom: 1px solid #e3e7e4; display: grid; gap: 18px; grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.2fr); padding: 16px 22px; }
+.group-admin-row:last-child { border-bottom: 0; }
+.group-name-controls { align-items: center; display: grid; gap: 8px; grid-template-columns: minmax(180px, 1fr) 36px auto; }
+.status-toggle { align-items: center; color: #69746f; display: flex; font-size: 0.72rem; gap: 5px; }
+.group-member-options { align-content: center; display: grid; gap: 8px 14px; grid-template-columns: repeat(2, minmax(140px, 1fr)); }
 .member-form { align-items: end; background: #ffffff; border: 1px solid #dce2de; display: grid; gap: 9px 14px; grid-template-columns: auto minmax(220px, 1fr) auto 150px auto; padding: 20px 22px; }
 .schedule-form { align-items: end; background: #ffffff; border: 1px solid #dce2de; border-top: 0; display: grid; gap: 9px 14px; grid-template-columns: auto 180px auto minmax(220px, 1fr) auto; padding: 20px 22px; }
 .member-form label { font-size: 0.75rem; font-weight: 700; }
 .member-form label, .schedule-form label { font-size: 0.75rem; font-weight: 700; }
-.member-form input, .member-form select, .schedule-form input, .assignment-row select { background: white; border: 1px solid #c8d0cb; border-radius: 4px; height: 38px; padding: 0 10px; }
+.member-form input, .member-form select, .schedule-form input, .assignment-row select { background: white; border: 1px solid #c8d0cb; border-radius: 4px; height: 38px; min-width: 0; padding: 0 10px; }
 .member-message { color: #0b7054; font-size: 0.75rem; grid-column: 2 / -1; margin: 0; }
 .assignment-list { background: #ffffff; border: 1px solid #dce2de; border-top: 0; }
 .assignment-row { align-items: center; border-bottom: 1px solid #e3e7e4; display: grid; font-size: 0.84rem; gap: 18px; grid-template-columns: 1fr minmax(220px, 320px); min-height: 62px; padding: 12px 22px; }
@@ -251,17 +315,26 @@ footer p { margin: 0; }
 
 @media (max-width: 900px) {
   .site-header { grid-template-columns: 1fr auto; }
-  .site-header nav { display: none; }
+  .site-header nav { grid-column: 1 / -1; grid-row: 2; height: 46px; justify-content: center; }
+  .site-header { padding-top: 8px; }
   .meeting-summary { grid-template-columns: 1fr; padding-top: 42px; }
   .meeting-facts > div:first-child { border-left: 0; padding-left: 0; }
   .agenda-row { grid-template-columns: 36px 105px 1fr auto; }
   .agenda-status { display: none; }
   .upload-control { grid-column: 3 / -1; align-items: flex-start; }
+  .meeting-entry-header { align-items: start; grid-template-columns: 1fr auto; }
+  .zoom-link { grid-column: 1 / -1; justify-self: start; }
+  .meeting-core-fields { grid-template-columns: auto minmax(0, 1fr); }
+  .group-picker { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  .agenda-draft-row { grid-template-columns: 34px minmax(180px, 1fr) 138px 138px; }
+  .row-tools { grid-column: 2 / -1; }
+  .group-admin-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
-  .site-header { min-height: 60px; padding: 0 18px; }
+  .site-header { gap: 0; min-height: 106px; padding: 8px 18px 0; }
   .brand-mark { height: 32px; width: 32px; }
+  .brand > span:last-child { display: none; }
   .access-label { display: none; }
   .meeting-summary { gap: 28px; padding: 36px 20px 42px; }
   h1 { font-size: 2.25rem; }
@@ -271,13 +344,22 @@ footer p { margin: 0; }
   .format-strip { margin-bottom: -42px; width: 100%; }
   .configuration-notice { align-items: flex-start; padding: 20px 20px 14px; }
   .auth-form { grid-template-columns: 1fr; width: 100%; }
-  .auth-form label, .auth-form input, .sign-in-button, .auth-message { grid-column: 1; }
+  .auth-form label, .auth-form input, .sign-in-button, .password-link-button, .auth-message { grid-column: 1; }
+  .password-link-button { justify-self: start; }
+  .password-form { align-items: stretch; flex-direction: column; width: 100%; }
   .configuration-notice.cloud-ready { flex-wrap: wrap; }
+  .meeting-collection { padding: 30px 16px 54px; }
+  .collection-heading h1 { font-size: 1.8rem; }
+  .meeting-entry { margin-bottom: 42px; }
+  .meeting-entry-header { grid-template-columns: 1fr; padding: 20px; }
+  .online-meeting-facts { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .zoom-link { grid-column: 1; max-width: 100%; white-space: normal; }
   .agenda-section, .resources-section, .admin-section { padding-left: 16px; padding-right: 16px; }
+  .meeting-entry .agenda-section, .meeting-entry .resources-section { padding-left: 0; padding-right: 0; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
   .agenda-row { align-items: start; gap: 12px; grid-template-columns: 32px 1fr; padding: 18px 16px; }
   .agenda-time { grid-column: 2; flex-direction: row; gap: 8px; }
-  .agenda-time span::before { content: "– "; }
+  .agenda-time span::before { content: "to "; }
   .agenda-group { grid-column: 2; }
   .upload-control { grid-column: 2; }
   .minutes-row { align-items: start; grid-template-columns: 44px 1fr; }
@@ -288,6 +370,18 @@ footer p { margin: 0; }
   .member-form label, .member-form input, .member-form select, .member-form button, .member-message { grid-column: 1; }
   .schedule-form label, .schedule-form input, .schedule-form button { grid-column: 1; }
   .assignment-row { align-items: start; grid-template-columns: 1fr; }
+  .meeting-core-fields, .add-group-form { align-items: stretch; grid-template-columns: 1fr; padding: 16px; }
+  .meeting-core-fields > *, .add-group-form > *, .add-group-form .member-message { grid-column: 1; }
+  .group-picker { grid-template-columns: 1fr; padding: 16px; }
+  .agenda-draft-row { align-items: start; grid-template-columns: 28px 1fr; padding: 14px 16px; }
+  .agenda-draft-row > label, .row-tools { grid-column: 2; }
+  .agenda-draft-row > label { grid-template-columns: 40px minmax(0, 1fr); }
+  .agenda-draft-row > label input { width: 100%; }
+  .form-command-row { align-items: flex-start; flex-direction: column; padding: 16px; }
+  .group-admin-row { padding: 16px; }
+  .group-name-controls { grid-template-columns: minmax(0, 1fr) 36px; }
+  .status-toggle { grid-column: 1 / -1; }
+  .group-member-options { grid-template-columns: 1fr; }
   footer { flex-direction: column; gap: 6px; padding: 22px 20px; }
 }
 
