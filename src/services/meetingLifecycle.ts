@@ -23,10 +23,10 @@ export function addMinutes(time: string, minutes: number): string {
   return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
-export function buildAgendaDraft(groups: ResearchGroup[], startsAt = '09:00') {
+export function buildAgendaDraft(groups: ResearchGroup[], startsAt = '09:00', slotMinutes = 20) {
   let cursor = startsAt
   return groups.map((group, index) => {
-    const endsAt = addMinutes(cursor, 20)
+    const endsAt = addMinutes(cursor, slotMinutes)
     const slot = {
       groupId: group.id,
       groupName: group.name,
@@ -41,6 +41,11 @@ export function buildAgendaDraft(groups: ResearchGroup[], startsAt = '09:00') {
 
 export function validateMeetingDraft(draft: MeetingDraft): string | null {
   if (!draft.date) return 'Meeting date is required.'
+  if (!draft.title.trim()) return 'Meeting title is required.'
+  if (!Number.isInteger(draft.presentationMinutes) || !Number.isInteger(draft.qaMinutes)
+    || draft.presentationMinutes < 1 || draft.qaMinutes < 1) {
+    return 'Enter positive presentation and Q&A durations.'
+  }
   let zoomUrl: URL
   try {
     zoomUrl = new URL(draft.zoomUrl)

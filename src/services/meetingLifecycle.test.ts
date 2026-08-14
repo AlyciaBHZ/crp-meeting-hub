@@ -13,6 +13,12 @@ const groups = [
   { id: 'group-2', name: "Prof Li Yang's group", active: true, memberIds: [] },
 ]
 
+const meetingDetails = {
+  title: 'CRP Grant Meeting - Decoding Adaptive Immunity',
+  presentationMinutes: 30,
+  qaMinutes: 10,
+}
+
 describe('meeting lifecycle', () => {
   it('classifies meetings from Singapore calendar dates', () => {
     expect(classifyMeetingDate('2026-08-13', '2026-08-14')).toBe('archive')
@@ -32,20 +38,22 @@ describe('meeting lifecycle', () => {
   })
 
   it('rejects incomplete and unsafe meeting drafts', () => {
-    expect(validateMeetingDraft({ date: '', zoomUrl: '', slots: [] })).toBe('Meeting date is required.')
-    expect(validateMeetingDraft({ date: '2026-10-14', zoomUrl: 'not-a-url', slots: [] })).toBe('Enter a valid Zoom URL.')
-    expect(validateMeetingDraft({ date: '2026-10-14', zoomUrl: 'http://zoom.us/j/123', slots: [] })).toBe('Enter a secure Zoom URL.')
-    expect(validateMeetingDraft({ date: '2026-10-14', zoomUrl: 'https://example.com/meeting', slots: [] })).toBe('Enter a Zoom URL.')
-    expect(validateMeetingDraft({ date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123', slots: [] })).toBe('Select at least one presenting group.')
+    expect(validateMeetingDraft({ ...meetingDetails, date: '', zoomUrl: '', slots: [] })).toBe('Meeting date is required.')
+    expect(validateMeetingDraft({ ...meetingDetails, title: ' ', date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123', slots: [] })).toBe('Meeting title is required.')
+    expect(validateMeetingDraft({ ...meetingDetails, presentationMinutes: 0, date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123', slots: [] })).toBe('Enter positive presentation and Q&A durations.')
+    expect(validateMeetingDraft({ ...meetingDetails, date: '2026-10-14', zoomUrl: 'not-a-url', slots: [] })).toBe('Enter a valid Zoom URL.')
+    expect(validateMeetingDraft({ ...meetingDetails, date: '2026-10-14', zoomUrl: 'http://zoom.us/j/123', slots: [] })).toBe('Enter a secure Zoom URL.')
+    expect(validateMeetingDraft({ ...meetingDetails, date: '2026-10-14', zoomUrl: 'https://example.com/meeting', slots: [] })).toBe('Enter a Zoom URL.')
+    expect(validateMeetingDraft({ ...meetingDetails, date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123', slots: [] })).toBe('Select at least one presenting group.')
     expect(validateMeetingDraft({
-      date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
+      ...meetingDetails, date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
       slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:20', endsAt: '09:00', sortOrder: 1 }],
     })).toBe('Every agenda end time must be after its start time.')
   })
 
   it('rejects overlapping group times', () => {
     expect(validateMeetingDraft({
-      date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
+      ...meetingDetails, date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
       slots: [
         { groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 },
         { groupId: 'group-2', groupName: 'Group 2', startsAt: '09:10', endsAt: '09:30', sortOrder: 2 },
@@ -55,7 +63,7 @@ describe('meeting lifecycle', () => {
 
   it('accepts a complete meeting draft', () => {
     expect(validateMeetingDraft({
-      date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
+      ...meetingDetails, date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
       slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 }],
     })).toBeNull()
   })

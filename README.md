@@ -18,7 +18,7 @@ npm run build
 
 ## Current Scope
 
-- Multiple upcoming meetings, each with its own date and private Zoom link
+- Multiple upcoming meetings, each with its own editable title, date, format, and private Zoom link
 - Reusable research groups with approved group members
 - A different selection and order of presenting groups for every meeting
 - Exact start and end time controls for every agenda slot
@@ -62,7 +62,7 @@ Visitors can see meeting dates and agendas. Only approved signed-in members can 
 
 ## Administrator Workflow
 
-Administrators create a meeting by choosing a date, entering its Zoom URL, selecting the groups presenting in that meeting, ordering them, and setting exact start and end times. Existing upcoming meetings can be edited in the same workspace. A meeting moves to **Archive** automatically after its date; there is no manual archive action or upload-completeness requirement.
+Administrators create a meeting by setting its title, date, presentation and Q&A durations, entering its Zoom URL, selecting the groups presenting in that meeting, ordering them, and setting exact start and end times. Existing upcoming meetings can be edited in the same workspace, including every one of those fields. A meeting moves to **Archive** automatically after its date; there is no manual archive action or upload-completeness requirement.
 
 For meetings that happened before this workspace was introduced, administrators use **Past meeting** to register the original date, participating Labs, order, and times. Historical meetings do not require or retain an obsolete Zoom link. In Archive, administrators may upload PDFs for any Lab that participated in that meeting; presenters can upload only for their assigned Labs. The database enforces the 20-PDF limit transactionally.
 

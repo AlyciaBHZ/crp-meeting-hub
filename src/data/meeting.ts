@@ -30,8 +30,11 @@ export interface AgendaDraftSlot {
 }
 
 export interface MeetingDraft {
+  title: string
   date: string
   zoomUrl: string
+  presentationMinutes: number
+  qaMinutes: number
   slots: AgendaDraftSlot[]
 }
 

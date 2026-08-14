@@ -25,8 +25,11 @@ interface AdminPanelProps {
 function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, onRegisterHistoricalMeeting }: Pick<AdminPanelProps, 'groups' | 'meetings' | 'onCreateMeeting' | 'onUpdateMeeting' | 'onRegisterHistoricalMeeting'>) {
   const [mode, setMode] = useState<'upcoming' | 'past'>('upcoming')
   const [editingMeetingId, setEditingMeetingId] = useState('')
+  const [title, setTitle] = useState('CRP Grant Meeting - Decoding Adaptive Immunity')
   const [date, setDate] = useState('')
   const [zoomUrl, setZoomUrl] = useState('')
+  const [presentationMinutes, setPresentationMinutes] = useState(30)
+  const [qaMinutes, setQaMinutes] = useState(10)
   const [slots, setSlots] = useState<AgendaDraftSlot[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -34,8 +37,11 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
   function changeMode(nextMode: 'upcoming' | 'past') {
     setMode(nextMode)
     setEditingMeetingId('')
+    setTitle('CRP Grant Meeting - Decoding Adaptive Immunity')
     setDate('')
     setZoomUrl('')
+    setPresentationMinutes(30)
+    setQaMinutes(10)
     setSlots([])
     setMessage(null)
   }
@@ -44,15 +50,21 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
     setEditingMeetingId(meetingId)
     setMessage(null)
     if (!meetingId) {
+      setTitle('CRP Grant Meeting - Decoding Adaptive Immunity')
       setDate('')
       setZoomUrl('')
+      setPresentationMinutes(30)
+      setQaMinutes(10)
       setSlots([])
       return
     }
     const meeting = meetings.find((candidate) => candidate.id === meetingId)
     if (!meeting) return
+    setTitle(meeting.title)
     setDate(meeting.dateISO ?? '')
     setZoomUrl(meeting.zoomUrl ?? '')
+    setPresentationMinutes(meeting.presentationMinutes)
+    setQaMinutes(meeting.qaMinutes)
     setSlots(meeting.slots.flatMap((slot, index) => slot.groupId ? [{
       id: slot.id,
       groupId: slot.groupId,
@@ -66,7 +78,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
   function toggleGroup(group: ResearchGroup, selected: boolean) {
     if (selected) {
       const startsAt = slots.at(-1)?.endsAt ?? '09:00'
-      const nextSlot = buildAgendaDraft([group], startsAt)[0]
+      const nextSlot = buildAgendaDraft([group], startsAt, mode === 'past' ? 20 : presentationMinutes + qaMinutes)[0]
       setSlots([...slots, { ...nextSlot, sortOrder: slots.length + 1 }])
       return
     }
@@ -94,7 +106,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    const meetingDraft = { date, zoomUrl: zoomUrl.trim(), slots }
+    const meetingDraft = { title, date, zoomUrl: zoomUrl.trim(), presentationMinutes, qaMinutes, slots }
     const historicalDraft = { date, slots }
     const validationError = mode === 'past'
       ? validateHistoricalMeetingDraft(historicalDraft, getSingaporeTodayISO())
@@ -114,8 +126,11 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
         await onCreateMeeting(meetingDraft)
       }
       setEditingMeetingId('')
+      setTitle('CRP Grant Meeting - Decoding Adaptive Immunity')
       setDate('')
       setZoomUrl('')
+      setPresentationMinutes(30)
+      setQaMinutes(10)
       setSlots([])
       setMessage(mode === 'past' ? 'Past meeting registered.' : editingMeetingId ? 'Meeting updated.' : 'Meeting created.')
     } catch (error) {
@@ -141,7 +156,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
             <label htmlFor="meeting-to-manage">Meeting to manage</label>
             <select id="meeting-to-manage" value={editingMeetingId} onChange={(event) => selectMeeting(event.target.value)}>
               <option value="">Create a new meeting</option>
-              {meetings.map((meeting) => <option key={meeting.id} value={meeting.id}>{meeting.date ?? meeting.title}</option>)}
+              {meetings.map((meeting) => <option key={meeting.id} value={meeting.id}>{meeting.date ?? 'Date pending'} - {meeting.title}</option>)}
             </select>
           </>}
           <label htmlFor="new-meeting-date">{mode === 'past' ? 'Past meeting date' : 'Meeting date'}</label>
@@ -151,6 +166,17 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
             <input id="new-meeting-zoom" type="url" required placeholder="https://zoom.us/j/..." value={zoomUrl} onChange={(event) => setZoomUrl(event.target.value)} />
           </>}
         </div>
+
+        {mode === 'upcoming' && (
+          <div className="meeting-format-fields">
+            <label htmlFor="meeting-title">Meeting title</label>
+            <input id="meeting-title" required value={title} onChange={(event) => setTitle(event.target.value)} />
+            <label htmlFor="presentation-minutes">Presentation minutes</label>
+            <input id="presentation-minutes" type="number" min="1" max="180" required value={presentationMinutes} onChange={(event) => setPresentationMinutes(Number(event.target.value))} />
+            <label htmlFor="qa-minutes">Q&amp;A minutes</label>
+            <input id="qa-minutes" type="number" min="1" max="60" required value={qaMinutes} onChange={(event) => setQaMinutes(Number(event.target.value))} />
+          </div>
+        )}
 
         <fieldset className="group-picker">
           <legend>Presenting groups</legend>

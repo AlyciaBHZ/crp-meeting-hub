@@ -65,9 +65,12 @@ export function createMeetingRepository(client: SupabaseClient) {
     },
 
     async createMeeting(draft: MeetingDraft) {
-      const result = await client.rpc('create_meeting_with_slots', {
+      const result = await client.rpc('create_meeting_with_details', {
+        title_input: draft.title.trim(),
         meeting_date_input: draft.date,
         zoom_url_input: draft.zoomUrl,
+        presentation_minutes_input: draft.presentationMinutes,
+        qa_minutes_input: draft.qaMinutes,
         slots_input: draft.slots.map((slot) => ({
           group_id: slot.groupId,
           starts_at: slot.startsAt,
@@ -94,10 +97,13 @@ export function createMeetingRepository(client: SupabaseClient) {
     },
 
     async updateMeetingSchedule(meetingId: string, draft: MeetingDraft) {
-      const result = await client.rpc('update_meeting_with_slots', {
+      const result = await client.rpc('update_meeting_with_details', {
         meeting_id_input: meetingId,
+        title_input: draft.title.trim(),
         meeting_date_input: draft.date,
         zoom_url_input: draft.zoomUrl,
+        presentation_minutes_input: draft.presentationMinutes,
+        qa_minutes_input: draft.qaMinutes,
         slots_input: draft.slots.map((slot) => ({
           slot_id: slot.id ?? null,
           group_id: slot.groupId,

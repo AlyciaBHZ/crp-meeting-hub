@@ -92,14 +92,20 @@ describe('meetingRepository', () => {
     const repository = createMeetingRepository({ rpc } as never)
 
     await expect(repository.createMeeting({
+      title: 'CRP Grant Meeting - Decoding Adaptive Immunity',
       date: '2026-10-14',
       zoomUrl: 'https://zoom.us/j/123',
+      presentationMinutes: 30,
+      qaMinutes: 10,
       slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 }],
     })).resolves.toBe('meeting-2')
 
-    expect(rpc).toHaveBeenCalledWith('create_meeting_with_slots', {
+    expect(rpc).toHaveBeenCalledWith('create_meeting_with_details', {
+      title_input: 'CRP Grant Meeting - Decoding Adaptive Immunity',
       meeting_date_input: '2026-10-14',
       zoom_url_input: 'https://zoom.us/j/123',
+      presentation_minutes_input: 30,
+      qa_minutes_input: 10,
       slots_input: [{ group_id: 'group-1', starts_at: '09:00', ends_at: '09:20', sort_order: 1 }],
     })
   })
@@ -108,15 +114,19 @@ describe('meetingRepository', () => {
     const rpc = vi.fn(() => Promise.resolve({ data: 'meeting-1', error: null }))
     const repository = createMeetingRepository({ rpc } as never)
     const draft = {
-      date: '2026-10-15', zoomUrl: 'https://zoom.us/j/new',
+      title: 'Updated immunity meeting', date: '2026-10-15', zoomUrl: 'https://zoom.us/j/new',
+      presentationMinutes: 30, qaMinutes: 10,
       slots: [{ id: 'slot-1', groupId: 'group-1', groupName: 'Group 1', startsAt: '10:00', endsAt: '10:20', sortOrder: 1 }],
     }
 
     await expect(repository.updateMeetingSchedule('meeting-1', draft)).resolves.toBe('meeting-1')
-    expect(rpc).toHaveBeenCalledWith('update_meeting_with_slots', {
+    expect(rpc).toHaveBeenCalledWith('update_meeting_with_details', {
       meeting_id_input: 'meeting-1',
+      title_input: 'Updated immunity meeting',
       meeting_date_input: '2026-10-15',
       zoom_url_input: 'https://zoom.us/j/new',
+      presentation_minutes_input: 30,
+      qa_minutes_input: 10,
       slots_input: [{ slot_id: 'slot-1', group_id: 'group-1', starts_at: '10:00', ends_at: '10:20', sort_order: 1 }],
     })
   })

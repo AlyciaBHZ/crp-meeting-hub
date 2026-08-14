@@ -35,10 +35,13 @@ describe('AdminPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create meeting' }))
 
     expect(onCreateMeeting).toHaveBeenCalledWith({
+      title: 'CRP Grant Meeting - Decoding Adaptive Immunity',
       date: '2026-10-14',
       zoomUrl: 'https://zoom.us/j/123',
+      presentationMinutes: 30,
+      qaMinutes: 10,
       slots: [{
-        groupId: 'group-1', groupName: "Prof Zhang Yang's group", startsAt: '09:00', endsAt: '09:20', sortOrder: 1,
+        groupId: 'group-1', groupName: "Prof Zhang Yang's group", startsAt: '09:00', endsAt: '09:40', sortOrder: 1,
       }],
     })
   })
@@ -81,12 +84,22 @@ describe('AdminPanel', () => {
     render(<AdminPanel {...baseProps} meetings={[meeting]} onUpdateMeeting={onUpdateMeeting} />)
 
     await userEvent.selectOptions(screen.getByLabelText('Meeting to manage'), 'meeting-1')
+    expect(screen.getByLabelText('Meeting title')).toHaveValue('CRP Grant Meeting')
+    expect(screen.getByLabelText('Presentation minutes')).toHaveValue(15)
+    expect(screen.getByLabelText('Q&A minutes')).toHaveValue(5)
+    await userEvent.clear(screen.getByLabelText('Meeting title'))
+    await userEvent.type(screen.getByLabelText('Meeting title'), 'Updated immunity meeting')
+    await userEvent.clear(screen.getByLabelText('Presentation minutes'))
+    await userEvent.type(screen.getByLabelText('Presentation minutes'), '30')
+    await userEvent.clear(screen.getByLabelText('Q&A minutes'))
+    await userEvent.type(screen.getByLabelText('Q&A minutes'), '10')
     await userEvent.clear(screen.getByLabelText('Zoom link'))
     await userEvent.type(screen.getByLabelText('Zoom link'), 'https://zoom.us/j/new')
     await userEvent.click(screen.getByRole('button', { name: 'Save meeting' }))
 
     expect(onUpdateMeeting).toHaveBeenCalledWith('meeting-1', expect.objectContaining({
-      date: '2026-10-14', zoomUrl: 'https://zoom.us/j/new',
+      title: 'Updated immunity meeting', date: '2026-10-14', zoomUrl: 'https://zoom.us/j/new',
+      presentationMinutes: 30, qaMinutes: 10,
       slots: [expect.objectContaining({ id: 'slot-1', groupId: 'group-1' })],
     }))
   })
