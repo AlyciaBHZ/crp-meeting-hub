@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, CalendarPlus, Save, UserPlus, Users, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarPlus, Save, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import type { AgendaDraftSlot, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup } from '../data/meeting'
 import { buildAgendaDraft, getSingaporeTodayISO, validateHistoricalMeetingDraft, validateMeetingDraft } from '../services/meetingLifecycle'
@@ -14,7 +14,6 @@ interface AdminPanelProps {
   profiles: ProfileRecord[]
   groups: ResearchGroup[]
   meetings: Meeting[]
-  onAddMember: (email: string, role: 'presenter' | 'admin') => Promise<void>
   onCreateMeeting: (draft: MeetingDraft) => Promise<void>
   onUpdateMeeting: (meetingId: string, draft: MeetingDraft) => Promise<void>
   onRegisterHistoricalMeeting: (draft: HistoricalMeetingDraft) => Promise<void>
@@ -262,50 +261,6 @@ function GroupManager({ groups, profiles, onCreateGroup, onUpdateGroup, onSetGro
   )
 }
 
-function MemberManager({ profiles, onAddMember }: Pick<AdminPanelProps, 'profiles' | 'onAddMember'>) {
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'presenter' | 'admin'>('presenter')
-  const [message, setMessage] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setPending(true)
-    setMessage(null)
-    try {
-      await onAddMember(email.trim().toLowerCase(), role)
-      setEmail('')
-      setMessage('Member approved. They can set up a password now.')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to add the member.')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <section className="admin-workspace-section" aria-labelledby="members-heading">
-      <div className="admin-subheading">
-        <div><p className="eyebrow">Account access</p><h3 id="members-heading">Approved members</h3></div>
-        <span className="member-count"><Users aria-hidden="true" size={16} /> {profiles.length} active</span>
-      </div>
-      <form className="member-form" onSubmit={submit}>
-        <label htmlFor="new-member-email">Member email</label>
-        <input id="new-member-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@institution.edu" />
-        <label htmlFor="new-member-role">Role</label>
-        <select id="new-member-role" aria-label="Role" value={role} onChange={(event) => setRole(event.target.value as 'presenter' | 'admin')}>
-          <option value="presenter">Presenter</option>
-          <option value="admin">Administrator</option>
-        </select>
-        <button className="upload-button" type="submit" disabled={pending}>
-          <UserPlus aria-hidden="true" size={17} /> {pending ? 'Adding...' : 'Add member'}
-        </button>
-        {message && <p className="member-message" role="status">{message}</p>}
-      </form>
-    </section>
-  )
-}
-
 export function AdminPanel(props: AdminPanelProps) {
   return (
     <section className="admin-section" aria-labelledby="admin-heading">
@@ -320,7 +275,6 @@ export function AdminPanel(props: AdminPanelProps) {
         onRegisterHistoricalMeeting={props.onRegisterHistoricalMeeting}
       />
       <GroupManager {...props} />
-      <MemberManager profiles={props.profiles} onAddMember={props.onAddMember} />
     </section>
   )
 }

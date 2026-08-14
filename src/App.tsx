@@ -184,10 +184,6 @@ export default function App() {
             profiles={profiles}
             groups={groups}
             meetings={meetings.upcoming}
-            onAddMember={async (email, role) => {
-              await repository.addMember(email, role)
-              setProfiles(await repository.getProfiles())
-            }}
             onCreateMeeting={async (draft: MeetingDraft) => {
               await repository.createMeeting(draft)
               await loadMeetings()

@@ -140,11 +140,6 @@ export function createMeetingRepository(client: SupabaseClient) {
       return result.data ?? []
     },
 
-    async addMember(email: string, role: 'presenter' | 'admin') {
-      const result = await client.from('member_allowlist').insert({ email: email.trim().toLowerCase(), role })
-      ensureNoError(result.error)
-    },
-
     async uploadSlides(slotId: string, userId: string, file: File) {
       const path = `${slotId}/slides`
       const uploadResult = await client.storage.from('slides').upload(path, file, { upsert: true })

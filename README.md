@@ -32,7 +32,7 @@ npm run build
 - Private Archive PDF collections grouped by Lab and meeting
 - Multiple PDF uploads with a 20-file limit per Lab per meeting
 - Slide and minutes replacement before or after a meeting moves to Archive
-- Administrator controls for meetings, groups, memberships, and administrator access
+- Administrator controls for meetings, groups, and Lab assignments
 - Responsive desktop and mobile layouts
 
 Without local Supabase environment variables, the application intentionally runs in local-preview mode and does not claim to upload selected files.
@@ -52,16 +52,11 @@ Copy `.env.example` to `.env.local` and use the Supabase project URL plus its pu
 
 ## Member Workflow
 
-The small CRP team may use centrally managed shared usernames. These aliases resolve to private Supabase Auth identities in the application; their passwords are configured directly in Supabase and are never committed to the repository.
+The small CRP team uses centrally managed shared member and administrator usernames. These aliases resolve to private Supabase Auth identities in the application; their passwords are configured directly in Supabase and are never committed to the repository. The administrator workspace intentionally does not create additional user accounts.
 
-For individual accounts:
-
-1. An administrator adds a team member's email under **Members and access**.
-2. The member uses **Set up or reset password** and opens the link sent by Supabase.
-3. The member chooses a password and subsequently signs in with email and password.
-4. The administrator assigns the activated member to one or more research groups.
-5. The member can upload or replace slides for those groups whenever they are scheduled.
-6. In Archive, the member selects one of their participating Labs and uploads up to 20 PDFs for that Lab and meeting.
+1. Members sign in with the shared member credentials.
+2. The shared member can upload or replace slides for scheduled Labs.
+3. In Archive, the shared member selects a participating Lab and uploads up to 20 PDFs for that Lab and meeting.
 
 Visitors can see meeting dates and agendas. Only approved signed-in members can see Zoom links, private resource metadata, or download files. Storage objects use private buckets and short-lived signed URLs.
 
@@ -71,7 +66,7 @@ Administrators create a meeting by choosing a date, entering its Zoom URL, selec
 
 For meetings that happened before this workspace was introduced, administrators use **Past meeting** to register the original date, participating Labs, order, and times. Historical meetings do not require or retain an obsolete Zoom link. In Archive, administrators may upload PDFs for any Lab that participated in that meeting; presenters can upload only for their assigned Labs. The database enforces the 20-PDF limit transactionally.
 
-Administrators can also add or rename research groups, deactivate groups that are no longer in use, assign activated members to groups, approve new presenters, and add additional administrators. `src/data/meeting.ts` remains the local-preview fallback when Supabase environment variables are absent.
+Administrators can also add or rename research groups, deactivate groups that are no longer in use, and maintain Lab assignments for the existing shared account. Account credentials are managed centrally rather than through the website. `src/data/meeting.ts` remains the local-preview fallback when Supabase environment variables are absent.
 
 ## Database Changes
 

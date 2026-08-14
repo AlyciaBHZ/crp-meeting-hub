@@ -165,15 +165,6 @@ describe('meetingRepository', () => {
     expect(createSignedUrl).toHaveBeenCalledWith('slot-1/slides.pdf', 60)
   })
 
-  it('adds an approved member using a normalized email address', async () => {
-    const insert = vi.fn(() => Promise.resolve({ error: null }))
-    const repository = createMeetingRepository({ from: vi.fn(() => ({ insert })) } as never)
-
-    await repository.addMember('Presenter@Example.com', 'presenter')
-
-    expect(insert).toHaveBeenCalledWith({ email: 'presenter@example.com', role: 'presenter' })
-  })
-
   it('replaces meeting minutes metadata instead of creating duplicate records', async () => {
     const upload = vi.fn(() => Promise.resolve({ data: { path: 'meeting-1/minutes' }, error: null }))
     const upsert = vi.fn(() => Promise.resolve({ error: null }))

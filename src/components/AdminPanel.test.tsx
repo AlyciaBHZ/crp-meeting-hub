@@ -15,7 +15,6 @@ const profiles = [
 const baseProps = {
   profiles,
   groups,
-  onAddMember: vi.fn(() => Promise.resolve()),
   onCreateMeeting: vi.fn(() => Promise.resolve()),
   onUpdateMeeting: vi.fn(() => Promise.resolve()),
   onRegisterHistoricalMeeting: vi.fn(() => Promise.resolve()),
@@ -116,15 +115,11 @@ describe('AdminPanel', () => {
     }))
   })
 
-  it('adds an approved administrator email', async () => {
-    const onAddMember = vi.fn(() => Promise.resolve())
-    render(<AdminPanel {...baseProps} onAddMember={onAddMember} />)
+  it('does not offer account creation because the team uses shared credentials', () => {
+    render(<AdminPanel {...baseProps} />)
 
-    await userEvent.type(screen.getByLabelText('Member email'), 'admin@example.com')
-    await userEvent.selectOptions(screen.getByLabelText('Role'), 'admin')
-    await userEvent.click(screen.getByRole('button', { name: 'Add member' }))
-
-    expect(onAddMember).toHaveBeenCalledWith('admin@example.com', 'admin')
+    expect(screen.queryByLabelText('Member email')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument()
   })
 
   it('assigns an activated presenter to a group', async () => {
