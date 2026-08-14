@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { HistoricalMeetingDraft, MeetingDraft, ResearchGroup } from '../data/meeting'
+import type { HistoricalMeetingDraft, MeetingDraft, ResearchGroup, SlideFile } from '../data/meeting'
 import { mapCloudMeeting } from './meetingAccess'
 import { classifyMeetingDate } from './meetingLifecycle'
 
@@ -15,13 +15,14 @@ function requireData<T>(data: T | null, message: string): T {
 export function createMeetingRepository(client: SupabaseClient) {
   return {
     async getMeetings(todayISO: string) {
-      const [meetingsResult, slotsResult, minutesResult, detailsResult, membershipsResult, archiveFilesResult] = await Promise.all([
+      const [meetingsResult, slotsResult, minutesResult, detailsResult, membershipsResult, archiveFilesResult, slideFilesResult] = await Promise.all([
         client.from('meetings').select('*').not('meeting_date', 'is', null).order('meeting_date'),
-        client.from('agenda_slots').select('*, resources(*)').order('sort_order'),
+        client.from('agenda_slots').select('*').order('sort_order'),
         client.from('resources').select('*').eq('kind', 'minutes').order('uploaded_at'),
         client.from('meeting_private_details').select('*').order('meeting_id'),
         client.from('group_members').select('*').order('created_at'),
         client.from('archive_lab_files').select('*').order('uploaded_at'),
+        client.from('slide_files').select('*').order('uploaded_at'),
       ])
       ensureNoError(meetingsResult.error)
       ensureNoError(slotsResult.error)
@@ -29,6 +30,7 @@ export function createMeetingRepository(client: SupabaseClient) {
       ensureNoError(detailsResult.error)
       ensureNoError(membershipsResult.error)
       ensureNoError(archiveFilesResult.error)
+      ensureNoError(slideFilesResult.error)
 
       const memberIdsByGroup = (membershipsResult.data ?? []).reduce<Record<string, string[]>>((lookup, membership) => {
         const groupId = String(membership.group_id)
@@ -43,6 +45,7 @@ export function createMeetingRepository(client: SupabaseClient) {
         (detailsResult.data ?? []).find((details) => details.meeting_id === meeting.id),
         memberIdsByGroup,
         (archiveFilesResult.data ?? []).filter((file) => file.meeting_id === meeting.id),
+        slideFilesResult.data ?? [],
       ))
 
       return {
@@ -146,30 +149,31 @@ export function createMeetingRepository(client: SupabaseClient) {
       return result.data ?? []
     },
 
-    async uploadSlides(slotId: string, userId: string, file: File) {
-      const path = `${slotId}/slides`
-      const uploadResult = await client.storage.from('slides').upload(path, file, { upsert: true })
-      ensureNoError(uploadResult.error)
+    async uploadSlideFile(slotId: string, displayName: string, file: File) {
+      const reservationResult = await client.rpc('reserve_slide_file', {
+        agenda_slot_id_input: slotId,
+        display_name_input: displayName.trim(),
+        original_name_input: file.name,
+        size_bytes_input: file.size,
+      })
+      ensureNoError(reservationResult.error)
+      const reservation = requireData(reservationResult.data, 'The slide PDF upload could not be reserved.') as { id: string; object_path: string }
+      const uploadResult = await client.storage.from('slides').upload(reservation.object_path, file, {
+        contentType: 'application/pdf',
+        upsert: false,
+      })
+      if (uploadResult.error) {
+        await client.rpc('cancel_slide_file', { file_id_input: reservation.id })
+        ensureNoError(uploadResult.error)
+      }
+      return requireData(uploadResult.data, 'The slide PDF upload returned no path.').path
+    },
 
-      const meetingIdResult = await client.from('agenda_slots').select('meeting_id').eq('id', slotId).single()
-      ensureNoError(meetingIdResult.error)
-      const slot = requireData(meetingIdResult.data, 'The agenda slot was not found.')
-      const metadataResult = await client.from('resources').upsert(
-        {
-          meeting_id: slot.meeting_id,
-          agenda_slot_id: slotId,
-          kind: 'slides',
-          bucket_id: 'slides',
-          object_path: path,
-          original_name: file.name,
-          mime_type: file.type,
-          size_bytes: file.size,
-          uploaded_by: userId,
-        },
-        { onConflict: 'kind,agenda_slot_id' },
-      )
+    async deleteSlideFile(file: Pick<SlideFile, 'id' | 'objectPath'>) {
+      const removeResult = await client.storage.from('slides').remove([file.objectPath])
+      ensureNoError(removeResult.error)
+      const metadataResult = await client.rpc('cancel_slide_file', { file_id_input: file.id })
       ensureNoError(metadataResult.error)
-      return requireData(uploadResult.data, 'The slide upload returned no path.').path
     },
 
     async getDownloadUrl(bucket: 'slides' | 'minutes' | 'archive-lab-files', path: string) {

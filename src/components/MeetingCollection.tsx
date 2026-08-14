@@ -1,6 +1,6 @@
 import { CalendarDays, Clock3, Video } from 'lucide-react'
 import { useId } from 'react'
-import type { AgendaSlot, ArchiveLabFile, Meeting } from '../data/meeting'
+import type { AgendaSlot, ArchiveLabFile, Meeting, SlideFile } from '../data/meeting'
 import { canManageSlot, type MemberProfile } from '../services/meetingAccess'
 import type { MeetingView } from '../services/meetingLifecycle'
 import { Agenda } from './Agenda'
@@ -11,9 +11,9 @@ interface MeetingCollectionProps {
   view: MeetingView
   meetings: Meeting[]
   profile: MemberProfile | null
-  cloudMode?: boolean
-  onUploadSlides?: (meeting: Meeting, slot: AgendaSlot, file: File) => Promise<void>
-  onDownloadSlides?: (meeting: Meeting, slot: AgendaSlot) => Promise<void>
+  onUploadSlides?: (meeting: Meeting, slot: AgendaSlot, displayName: string, file: File) => Promise<void>
+  onDownloadSlides?: (meeting: Meeting, file: SlideFile) => Promise<void>
+  onRemoveSlides?: (meeting: Meeting, file: SlideFile) => Promise<void>
   onUploadMinutes?: (meeting: Meeting, file: File) => Promise<void>
   onDownloadMinutes?: (meeting: Meeting) => Promise<void>
   onUploadArchiveFiles?: (meeting: Meeting, groupId: string, files: File[]) => Promise<void>
@@ -29,9 +29,9 @@ export function MeetingCollection({
   view,
   meetings,
   profile,
-  cloudMode = true,
   onUploadSlides,
   onDownloadSlides,
+  onRemoveSlides,
   onUploadMinutes,
   onDownloadMinutes,
   onUploadArchiveFiles,
@@ -75,10 +75,11 @@ export function MeetingCollection({
 
             <Agenda
               meeting={meeting}
-              cloudMode={cloudMode}
+              profile={profile}
               canUpload={(slot) => canManageSlot(profile, slot)}
-              onUpload={onUploadSlides ? (slot, file) => onUploadSlides(meeting, slot, file) : undefined}
-              onDownload={profile && onDownloadSlides ? (slot) => onDownloadSlides(meeting, slot) : undefined}
+              onUpload={view === 'upcoming' && onUploadSlides ? (slot, displayName, file) => onUploadSlides(meeting, slot, displayName, file) : undefined}
+              onDownload={profile && onDownloadSlides ? (file) => onDownloadSlides(meeting, file) : undefined}
+              onRemove={profile && onRemoveSlides ? (file) => onRemoveSlides(meeting, file) : undefined}
             />
             <Resources
               meeting={meeting}

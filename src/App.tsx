@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminPanel, type ProfileRecord } from './components/AdminPanel'
 import { AuthPanel } from './components/AuthPanel'
 import { MeetingCollection } from './components/MeetingCollection'
-import type { AgendaSlot, ArchiveLabFile, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup } from './data/meeting'
+import type { AgendaSlot, ArchiveLabFile, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup, SlideFile } from './data/meeting'
 import { upcomingMeeting } from './data/meeting'
 import type { MemberProfile } from './services/meetingAccess'
 import { isSharedLogin, resolveLoginIdentity } from './services/loginIdentity'
@@ -106,9 +106,9 @@ export default function App() {
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
   }
 
-  async function uploadSlides(_meeting: Meeting, slot: AgendaSlot, file: File) {
+  async function uploadSlides(_meeting: Meeting, slot: AgendaSlot, displayName: string, file: File) {
     if (!repository || !user) throw new Error('Sign in before uploading slides.')
-    await repository.uploadSlides(slot.id, user.id, file)
+    await repository.uploadSlideFile(slot.id, displayName, file)
     await loadMeetings()
   }
 
@@ -161,9 +161,12 @@ export default function App() {
           view={view}
           meetings={meetings[view]}
           profile={profile}
-          cloudMode={isSupabaseConfigured}
           onUploadSlides={isSupabaseConfigured ? uploadSlides : undefined}
-          onDownloadSlides={user && profile ? (_meeting, slot) => download('slides', slot.slideObjectPath) : undefined}
+          onDownloadSlides={user && profile ? (_meeting, file) => download('slides', file.objectPath) : undefined}
+          onRemoveSlides={user && profile && repository ? async (_meeting, file: SlideFile) => {
+            await repository.deleteSlideFile(file)
+            await loadMeetings()
+          } : undefined}
           onUploadMinutes={isAdmin && repository && user ? async (meeting, file) => {
             await repository.uploadMinutes(meeting.id, user.id, file)
             await loadMeetings()

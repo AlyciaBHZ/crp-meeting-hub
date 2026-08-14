@@ -32,17 +32,26 @@ describe('meetingRepository', () => {
         id: 'file-1', meeting_id: 'past', group_id: 'group-1', original_name: 'paper.pdf',
         object_path: 'past/group-1/file-1.pdf', size_bytes: 100, uploaded_at: '2026-06-15T01:00:00Z',
       }],
+      slide_files: [{
+        id: 'slide-file-1', agenda_slot_id: 'slot-future', display_name: 'Immune adaptation update',
+        original_name: 'update.pdf', object_path: 'slot-future/slide-file-1.pdf', size_bytes: 100,
+        uploaded_by: 'member-1', uploaded_at: '2026-08-13T01:00:00Z',
+      }],
     } as Record<string, unknown[]>
     const from = vi.fn((table: string) => queryResult(rows[table]))
     const repository = createMeetingRepository({ from } as never)
 
     await expect(repository.getMeetings('2026-08-14')).resolves.toEqual(expect.objectContaining({
-      upcoming: [expect.objectContaining({ id: 'future', zoomUrl: 'https://zoom.us/j/123' })],
+      upcoming: [expect.objectContaining({
+        id: 'future', zoomUrl: 'https://zoom.us/j/123',
+        slots: [expect.objectContaining({ slideFiles: [expect.objectContaining({ displayName: 'Immune adaptation update' })] })],
+      })],
       archive: [expect.objectContaining({ id: 'past', archiveFiles: [expect.objectContaining({ originalName: 'paper.pdf' })] })],
     }))
     expect(from).toHaveBeenCalledWith('meetings')
     expect(from).toHaveBeenCalledWith('agenda_slots')
     expect(from).toHaveBeenCalledWith('meeting_private_details')
+    expect(from).toHaveBeenCalledWith('slide_files')
   })
 
   it('registers a past meeting without a Zoom link', async () => {
@@ -149,22 +158,58 @@ describe('meetingRepository', () => {
     expect(remove).toHaveBeenCalled()
   })
 
-  it('uploads slides into the private slides bucket and records metadata', async () => {
-    const upload = vi.fn(() => Promise.resolve({ data: { path: 'slot-1/slides' }, error: null }))
-    const upsert = vi.fn(() => Promise.resolve({ error: null }))
-    const slotQuery = queryResult({ meeting_id: 'meeting-1' })
+  it('reserves metadata before uploading a named PDF to the private slides bucket', async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: { id: 'slide-file-1', object_path: 'slot-1/slide-file-1.pdf' }, error: null,
+    }))
+    const upload = vi.fn(() => Promise.resolve({ data: { path: 'slot-1/slide-file-1.pdf' }, error: null }))
     const repository = createMeetingRepository({
       storage: { from: vi.fn(() => ({ upload })) },
-      from: vi.fn((table: string) => table === 'agenda_slots' ? slotQuery : ({ upsert })),
+      rpc,
     } as never)
     const file = new File(['slides'], 'slides.pdf', { type: 'application/pdf' })
+    const uploadSlideFile = (repository as typeof repository & {
+      uploadSlideFile?: (slotId: string, displayName: string, file: File) => Promise<string>
+    }).uploadSlideFile
 
-    await expect(repository.uploadSlides('slot-1', 'user-1', file)).resolves.toBe('slot-1/slides')
-    expect(upload).toHaveBeenCalledWith('slot-1/slides', file, { upsert: true })
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ agenda_slot_id: 'slot-1', uploaded_by: 'user-1' }),
-      { onConflict: 'kind,agenda_slot_id' },
-    )
+    expect(uploadSlideFile).toBeDefined()
+    if (!uploadSlideFile) return
+    await expect(uploadSlideFile('slot-1', '  Yang Li update  ', file)).resolves.toBe('slot-1/slide-file-1.pdf')
+    expect(rpc).toHaveBeenCalledWith('reserve_slide_file', {
+      agenda_slot_id_input: 'slot-1', display_name_input: 'Yang Li update',
+      original_name_input: 'slides.pdf', size_bytes_input: file.size,
+    })
+    expect(upload).toHaveBeenCalledWith('slot-1/slide-file-1.pdf', file, { contentType: 'application/pdf', upsert: false })
+  })
+
+  it('cancels an unused slide reservation when Storage upload fails', async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { id: 'slide-file-1', object_path: 'slot-1/slide-file-1.pdf' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+    const upload = vi.fn(() => Promise.resolve({ data: null, error: { message: 'Storage unavailable' } }))
+    const repository = createMeetingRepository({ rpc, storage: { from: vi.fn(() => ({ upload })) } } as never)
+    const uploadSlideFile = (repository as typeof repository & {
+      uploadSlideFile?: (slotId: string, displayName: string, file: File) => Promise<string>
+    }).uploadSlideFile
+
+    if (!uploadSlideFile) return
+    await expect(uploadSlideFile('slot-1', 'Yang Li update', new File(['pdf'], 'slides.pdf'))).rejects.toThrow('Storage unavailable')
+    expect(rpc).toHaveBeenLastCalledWith('cancel_slide_file', { file_id_input: 'slide-file-1' })
+  })
+
+  it('removes a stored slide PDF before releasing its metadata', async () => {
+    const remove = vi.fn(() => Promise.resolve({ data: [], error: null }))
+    const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }))
+    const repository = createMeetingRepository({ rpc, storage: { from: vi.fn(() => ({ remove })) } } as never)
+    const deleteSlideFile = (repository as typeof repository & {
+      deleteSlideFile?: (file: { id: string; objectPath: string }) => Promise<void>
+    }).deleteSlideFile
+
+    expect(deleteSlideFile).toBeDefined()
+    if (!deleteSlideFile) return
+    await deleteSlideFile({ id: 'slide-file-1', objectPath: 'slot-1/slide-file-1.pdf' })
+    expect(remove).toHaveBeenCalledWith(['slot-1/slide-file-1.pdf'])
+    expect(rpc).toHaveBeenCalledWith('cancel_slide_file', { file_id_input: 'slide-file-1' })
   })
 
   it('creates a signed download URL for a private resource', async () => {

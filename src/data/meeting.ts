@@ -1,16 +1,26 @@
 export type SlideStatus = 'awaiting' | 'uploaded'
 
+export interface SlideFile {
+  id: string
+  agendaSlotId: string
+  displayName: string
+  originalName: string
+  objectPath: string
+  sizeBytes: number
+  uploadedBy: string
+  uploadedAt: string
+}
+
 export interface AgendaSlot {
   id: string
   startsAt: string
   endsAt: string
   groupName: string
   slideStatus: SlideStatus
-  slideFileName?: string
-  slideObjectPath?: string
   presenterId?: string
   groupId?: string
   groupMemberIds?: string[]
+  slideFiles?: SlideFile[]
 }
 
 export interface ResearchGroup {

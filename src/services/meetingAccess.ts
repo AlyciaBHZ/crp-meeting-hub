@@ -24,6 +24,7 @@ export function mapCloudMeeting(
   privateDetails?: Record<string, unknown> | null,
   groupMemberIds: Record<string, string[]> = {},
   archiveFiles: Array<Record<string, unknown>> = [],
+  slideFiles: Array<Record<string, unknown>> = [],
 ): Meeting {
   const groupNames = Object.fromEntries(slots.map((slot) => [String(slot.group_id), String(slot.group_name)]))
   return {
@@ -49,8 +50,18 @@ export function mapCloudMeeting(
       uploadedAt: String(file.uploaded_at),
     })),
     slots: slots.map((slot) => {
-      const resources = (slot.resources ?? []) as Array<Record<string, unknown>>
-      const slides = resources.find((resource) => resource.kind === 'slides') ?? resources[0]
+      const slotSlideFiles = slideFiles
+        .filter((file) => String(file.agenda_slot_id) === String(slot.id))
+        .map((file) => ({
+          id: String(file.id),
+          agendaSlotId: String(file.agenda_slot_id),
+          displayName: String(file.display_name),
+          originalName: String(file.original_name),
+          objectPath: String(file.object_path),
+          sizeBytes: Number(file.size_bytes),
+          uploadedBy: String(file.uploaded_by),
+          uploadedAt: String(file.uploaded_at),
+        }))
       return {
         id: String(slot.id),
         startsAt: String(slot.starts_at).slice(0, 5),
@@ -59,9 +70,8 @@ export function mapCloudMeeting(
         presenterId: slot.presenter_id ? String(slot.presenter_id) : undefined,
         groupId: slot.group_id ? String(slot.group_id) : undefined,
         groupMemberIds: slot.group_id ? (groupMemberIds[String(slot.group_id)] ?? []) : [],
-        slideStatus: slides ? 'uploaded' : 'awaiting',
-        slideFileName: slides?.original_name ? String(slides.original_name) : undefined,
-        slideObjectPath: slides?.object_path ? String(slides.object_path) : undefined,
+        slideStatus: slotSlideFiles.length ? 'uploaded' : 'awaiting',
+        slideFiles: slotSlideFiles,
       }
     }),
   }

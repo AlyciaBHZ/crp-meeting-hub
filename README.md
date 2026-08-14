@@ -24,14 +24,14 @@ npm run build
 - Exact start and end time controls for every agenda slot
 - Shared username or personal email and password sign-in
 - Email-link password setup and reset flow
-- Private PDF, PPT, and PPTX slide uploads up to 50 MB
+- Private named PDF slide collections, up to 20 files per Lab per meeting and 50 MB per file
 - Private PDF, DOCX, and Markdown meeting-minutes uploads up to 50 MB
 - 60-second signed download links
 - Automatic archive placement based on the Singapore calendar date
 - Administrator registration of past meetings without obsolete Zoom links
 - Private Archive PDF collections grouped by Lab and meeting
-- Multiple PDF uploads with a 20-file limit per Lab per meeting
-- Slide and minutes replacement before or after a meeting moves to Archive
+- Separate Archive Lab PDF collections with a 20-file limit per Lab per meeting
+- Slide PDF upload before the meeting and administrator-managed minutes uploads
 - Administrator controls for meetings, groups, and Lab assignments
 - Responsive desktop and mobile layouts
 
@@ -55,8 +55,9 @@ Copy `.env.example` to `.env.local` and use the Supabase project URL plus its pu
 The small CRP team uses centrally managed shared member and administrator usernames. These aliases resolve to private Supabase Auth identities in the application; their passwords are configured directly in Supabase and are never committed to the repository. The administrator workspace intentionally does not create additional user accounts.
 
 1. Members sign in with the shared member credentials.
-2. The shared member can upload or replace slides for scheduled Labs.
-3. In Archive, the shared member selects a participating Lab and uploads up to 20 PDFs for that Lab and meeting.
+2. Before a meeting, the shared member opens the scheduled Lab, enters a presenter or document name, chooses a PDF, and uploads it.
+3. Each scheduled Lab can hold up to 20 slide PDFs for that meeting. Every PDF is private, limited to 50 MB, and remains individually downloadable.
+4. In Archive, signed-in members can review and download the meeting's slide PDFs. The separate Lab PDF archive accepts up to 20 additional PDFs per participating Lab.
 
 Visitors can see meeting dates and agendas. Only approved signed-in members can see Zoom links, private resource metadata, or download files. Storage objects use private buckets and short-lived signed URLs.
 
@@ -64,7 +65,7 @@ Visitors can see meeting dates and agendas. Only approved signed-in members can 
 
 Administrators create a meeting by setting its title, date, presentation and Q&A durations, entering its Zoom URL, selecting the groups presenting in that meeting, ordering them, and setting exact start and end times. Existing upcoming meetings can be edited in the same workspace, including every one of those fields. A meeting moves to **Archive** automatically after its date; there is no manual archive action or upload-completeness requirement.
 
-For meetings that happened before this workspace was introduced, administrators use **Past meeting** to register the original date, participating Labs, order, and times. Historical meetings do not require or retain an obsolete Zoom link. In Archive, administrators may upload PDFs for any Lab that participated in that meeting; presenters can upload only for their assigned Labs. The database enforces the 20-PDF limit transactionally.
+For meetings that happened before this workspace was introduced, administrators use **Past meeting** to register the original date, participating Labs, order, and times. Historical meetings do not require or retain an obsolete Zoom link. In Archive, administrators may upload PDFs for any Lab that participated in that meeting; presenters can upload only for their assigned Labs. The database transactionally enforces both 20-PDF limits. Administrators or the original uploader can remove a slide PDF; a Lab with uploaded Slides cannot be removed from an agenda until those PDFs are removed.
 
 Administrators can also add or rename research groups, deactivate groups that are no longer in use, and maintain Lab assignments for the existing shared account. Account credentials are managed centrally rather than through the website. `src/data/meeting.ts` remains the local-preview fallback when Supabase environment variables are absent.
 

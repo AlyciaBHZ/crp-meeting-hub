@@ -14,7 +14,10 @@ const pastMeeting: Meeting = {
   zoomUrl: 'https://zoom.us/j/past',
   slots: [{
     id: 'slot-1', startsAt: '09:00', endsAt: '09:20', groupName: 'Group 1', groupId: 'group-1',
-    groupMemberIds: ['member-1'], slideStatus: 'uploaded', slideFileName: 'slides.pdf', slideObjectPath: 'slot-1/slides',
+    groupMemberIds: ['member-1'], slideStatus: 'uploaded', slideFiles: [{
+      id: 'slide-file-1', agendaSlotId: 'slot-1', displayName: 'Project update', originalName: 'slides.pdf',
+      objectPath: 'slot-1/slide-file-1.pdf', sizeBytes: 1024, uploadedBy: 'member-1', uploadedAt: '2026-06-13T01:00:00Z',
+    }],
   }],
   minutesFileName: 'minutes.pdf',
   minutesObjectPath: 'meeting-past/minutes',
@@ -39,7 +42,8 @@ describe('MeetingCollection', () => {
     expect(screen.getByRole('heading', { name: 'Past meetings' })).toBeInTheDocument()
     expect(screen.getAllByText('14 Jun 2026')).toHaveLength(2)
     expect(screen.queryByRole('link', { name: 'Open Zoom meeting' })).not.toBeInTheDocument()
-    expect(screen.getByText('slides.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Project update')).toBeInTheDocument()
+    expect(screen.getByText(/slides\.pdf/)).toBeInTheDocument()
     expect(screen.getByText('minutes.pdf')).toBeInTheDocument()
   })
 
@@ -81,5 +85,25 @@ describe('MeetingCollection', () => {
 
     expect(screen.getByRole('option', { name: 'Group 1' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Group 2' })).toBeInTheDocument()
+  })
+
+  it('shows named PDF slide controls only for an authorized upcoming Lab', () => {
+    const upcoming = {
+      ...pastMeeting,
+      id: 'meeting-future',
+      date: '14 Oct 2026',
+      dateISO: '2026-10-14',
+      slots: pastMeeting.slots.map((slot) => ({ ...slot, slideStatus: 'awaiting' as const, slideFiles: [] })),
+    }
+    const { rerender } = render(
+      <MeetingCollection {...callbacks} view="upcoming" meetings={[upcoming]} profile={{ id: 'member-1', role: 'presenter' }} />,
+    )
+
+    expect(screen.getByLabelText('Presenter / document name')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose PDF' })).toBeInTheDocument()
+    expect(screen.getByText('0 / 20 PDFs')).toBeInTheDocument()
+
+    rerender(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
+    expect(screen.queryByLabelText('Presenter / document name')).not.toBeInTheDocument()
   })
 })

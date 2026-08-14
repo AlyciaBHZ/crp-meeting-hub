@@ -1,19 +1,16 @@
 export const MAX_SLIDES_SIZE = 50 * 1024 * 1024
 export const MAX_ARCHIVE_FILES_PER_LAB = 20
+export const MAX_SLIDE_FILES_PER_LAB = 20
 
-const allowedExtensions = new Set(['pdf', 'ppt', 'pptx'])
-
-export function validateSlidesFile(file: File): string | null {
-  const extension = file.name.split('.').pop()?.toLowerCase()
-
-  if (!extension || !allowedExtensions.has(extension)) {
-    return 'Please choose a PDF, PPT, or PPTX file.'
+export function validateSlidePdf(displayName: string, file: File, existingCount: number): string | null {
+  const name = displayName.trim()
+  if (!name) return 'Enter a presenter or document name.'
+  if (name.length > 160) return 'Keep the presenter or document name within 160 characters.'
+  if (file.name.split('.').pop()?.toLowerCase() !== 'pdf') return 'Please choose a PDF file.'
+  if (file.size < 1 || file.size > MAX_SLIDES_SIZE) return 'The PDF must be 50 MB or smaller.'
+  if (existingCount >= MAX_SLIDE_FILES_PER_LAB) {
+    return 'Each Lab can upload up to 20 slide PDFs for this meeting.'
   }
-
-  if (file.size > MAX_SLIDES_SIZE) {
-    return 'The file must be 50 MB or smaller.'
-  }
-
   return null
 }
 
