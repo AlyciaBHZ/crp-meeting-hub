@@ -1,9 +1,10 @@
 import { CalendarDays, Clock3, Video } from 'lucide-react'
 import { useId } from 'react'
-import type { AgendaSlot, Meeting } from '../data/meeting'
+import type { AgendaSlot, ArchiveLabFile, Meeting } from '../data/meeting'
 import { canManageSlot, type MemberProfile } from '../services/meetingAccess'
 import type { MeetingView } from '../services/meetingLifecycle'
 import { Agenda } from './Agenda'
+import { ArchiveLabFiles } from './ArchiveLabFiles'
 import { Resources } from './Resources'
 
 interface MeetingCollectionProps {
@@ -15,6 +16,8 @@ interface MeetingCollectionProps {
   onDownloadSlides?: (meeting: Meeting, slot: AgendaSlot) => Promise<void>
   onUploadMinutes?: (meeting: Meeting, file: File) => Promise<void>
   onDownloadMinutes?: (meeting: Meeting) => Promise<void>
+  onUploadArchiveFiles?: (meeting: Meeting, groupId: string, files: File[]) => Promise<void>
+  onDownloadArchiveFile?: (meeting: Meeting, file: ArchiveLabFile) => Promise<void>
 }
 
 function meetingTime(meeting: Meeting) {
@@ -31,6 +34,8 @@ export function MeetingCollection({
   onDownloadSlides,
   onUploadMinutes,
   onDownloadMinutes,
+  onUploadArchiveFiles,
+  onDownloadArchiveFile,
 }: MeetingCollectionProps) {
   const headingId = useId()
   const isAdmin = profile?.role === 'admin'
@@ -81,6 +86,14 @@ export function MeetingCollection({
               onUpload={isAdmin && onUploadMinutes ? (file) => onUploadMinutes(meeting, file) : undefined}
               onDownload={profile && meeting.minutesObjectPath && onDownloadMinutes ? () => onDownloadMinutes(meeting) : undefined}
             />
+            {view === 'archive' && profile && (
+              <ArchiveLabFiles
+                meeting={meeting}
+                profile={profile}
+                onUpload={onUploadArchiveFiles ? (groupId, files) => onUploadArchiveFiles(meeting, groupId, files) : undefined}
+                onDownload={onDownloadArchiveFile ? (file) => onDownloadArchiveFile(meeting, file) : undefined}
+              />
+            )}
           </article>
         )
       })}

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { MeetingDraft, ResearchGroup } from '../data/meeting'
+import type { HistoricalMeetingDraft, MeetingDraft, ResearchGroup } from '../data/meeting'
 import { mapCloudMeeting } from './meetingAccess'
 import { classifyMeetingDate } from './meetingLifecycle'
 
@@ -15,18 +15,20 @@ function requireData<T>(data: T | null, message: string): T {
 export function createMeetingRepository(client: SupabaseClient) {
   return {
     async getMeetings(todayISO: string) {
-      const [meetingsResult, slotsResult, minutesResult, detailsResult, membershipsResult] = await Promise.all([
+      const [meetingsResult, slotsResult, minutesResult, detailsResult, membershipsResult, archiveFilesResult] = await Promise.all([
         client.from('meetings').select('*').not('meeting_date', 'is', null).order('meeting_date'),
         client.from('agenda_slots').select('*, resources(*)').order('sort_order'),
         client.from('resources').select('*').eq('kind', 'minutes').order('uploaded_at'),
         client.from('meeting_private_details').select('*').order('meeting_id'),
         client.from('group_members').select('*').order('created_at'),
+        client.from('archive_lab_files').select('*').order('uploaded_at'),
       ])
       ensureNoError(meetingsResult.error)
       ensureNoError(slotsResult.error)
       ensureNoError(minutesResult.error)
       ensureNoError(detailsResult.error)
       ensureNoError(membershipsResult.error)
+      ensureNoError(archiveFilesResult.error)
 
       const memberIdsByGroup = (membershipsResult.data ?? []).reduce<Record<string, string[]>>((lookup, membership) => {
         const groupId = String(membership.group_id)
@@ -40,6 +42,7 @@ export function createMeetingRepository(client: SupabaseClient) {
         (minutesResult.data ?? []).find((minutes) => minutes.meeting_id === meeting.id),
         (detailsResult.data ?? []).find((details) => details.meeting_id === meeting.id),
         memberIdsByGroup,
+        (archiveFilesResult.data ?? []).filter((file) => file.meeting_id === meeting.id),
       ))
 
       return {
@@ -74,6 +77,20 @@ export function createMeetingRepository(client: SupabaseClient) {
       })
       ensureNoError(result.error)
       return requireData(result.data, 'The meeting could not be created.')
+    },
+
+    async registerHistoricalMeeting(draft: HistoricalMeetingDraft) {
+      const result = await client.rpc('register_historical_meeting', {
+        meeting_date_input: draft.date,
+        slots_input: draft.slots.map((slot) => ({
+          group_id: slot.groupId,
+          starts_at: slot.startsAt,
+          ends_at: slot.endsAt,
+          sort_order: slot.sortOrder,
+        })),
+      })
+      ensureNoError(result.error)
+      return requireData(result.data, 'The past meeting could not be registered.')
     },
 
     async updateMeetingSchedule(meetingId: string, draft: MeetingDraft) {
@@ -154,10 +171,30 @@ export function createMeetingRepository(client: SupabaseClient) {
       return requireData(uploadResult.data, 'The slide upload returned no path.').path
     },
 
-    async getDownloadUrl(bucket: 'slides' | 'minutes', path: string) {
+    async getDownloadUrl(bucket: 'slides' | 'minutes' | 'archive-lab-files', path: string) {
       const result = await client.storage.from(bucket).createSignedUrl(path, 60)
       ensureNoError(result.error)
       return requireData(result.data, 'The download link could not be created.').signedUrl
+    },
+
+    async uploadArchiveLabFile(meetingId: string, groupId: string, file: File) {
+      const reservationResult = await client.rpc('reserve_archive_lab_file', {
+        meeting_id_input: meetingId,
+        group_id_input: groupId,
+        original_name_input: file.name,
+        size_bytes_input: file.size,
+      })
+      ensureNoError(reservationResult.error)
+      const reservation = requireData(reservationResult.data, 'The PDF upload could not be reserved.') as { id: string; object_path: string }
+      const uploadResult = await client.storage.from('archive-lab-files').upload(reservation.object_path, file, {
+        contentType: 'application/pdf',
+        upsert: false,
+      })
+      if (uploadResult.error) {
+        await client.rpc('cancel_archive_lab_file', { file_id_input: reservation.id })
+        ensureNoError(uploadResult.error)
+      }
+      return requireData(uploadResult.data, 'The PDF upload returned no path.').path
     },
 
     async uploadMinutes(meetingId: string, userId: string, file: File) {

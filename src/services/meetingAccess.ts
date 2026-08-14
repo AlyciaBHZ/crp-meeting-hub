@@ -23,7 +23,9 @@ export function mapCloudMeeting(
   minutes?: Record<string, unknown> | null,
   privateDetails?: Record<string, unknown> | null,
   groupMemberIds: Record<string, string[]> = {},
+  archiveFiles: Array<Record<string, unknown>> = [],
 ): Meeting {
+  const groupNames = Object.fromEntries(slots.map((slot) => [String(slot.group_id), String(slot.group_name)]))
   return {
     id: String(meeting.id),
     title: String(meeting.title),
@@ -36,6 +38,16 @@ export function mapCloudMeeting(
     minutesFileName: minutes?.original_name ? String(minutes.original_name) : undefined,
     minutesObjectPath: minutes?.object_path ? String(minutes.object_path) : undefined,
     zoomUrl: privateDetails?.zoom_url ? String(privateDetails.zoom_url) : undefined,
+    archiveFiles: archiveFiles.map((file) => ({
+      id: String(file.id),
+      meetingId: String(file.meeting_id),
+      groupId: String(file.group_id),
+      groupName: groupNames[String(file.group_id)] ?? 'Unknown Lab',
+      originalName: String(file.original_name),
+      objectPath: String(file.object_path),
+      sizeBytes: Number(file.size_bytes),
+      uploadedAt: String(file.uploaded_at),
+    })),
     slots: slots.map((slot) => {
       const resources = (slot.resources ?? []) as Array<Record<string, unknown>>
       const slides = resources.find((resource) => resource.kind === 'slides') ?? resources[0]

@@ -1,4 +1,4 @@
-import type { MeetingDraft, ResearchGroup } from '../data/meeting'
+import type { HistoricalMeetingDraft, MeetingDraft, ResearchGroup } from '../data/meeting'
 
 export type MeetingView = 'upcoming' | 'archive'
 
@@ -58,4 +58,21 @@ export function validateMeetingDraft(draft: MeetingDraft): string | null {
   )))
   if (hasOverlap) return 'Agenda times cannot overlap.'
   return null
+}
+
+function validateAgenda(slots: HistoricalMeetingDraft['slots']): string | null {
+  if (!slots.length) return 'Select at least one presenting group.'
+  if (slots.some((slot) => slot.endsAt <= slot.startsAt)) {
+    return 'Every agenda end time must be after its start time.'
+  }
+  const hasOverlap = slots.some((slot, index) => slots.some((other, otherIndex) => (
+    index < otherIndex && slot.startsAt < other.endsAt && other.startsAt < slot.endsAt
+  )))
+  return hasOverlap ? 'Agenda times cannot overlap.' : null
+}
+
+export function validateHistoricalMeetingDraft(draft: HistoricalMeetingDraft, todayISO: string): string | null {
+  if (!draft.date) return 'Meeting date is required.'
+  if (draft.date >= todayISO) return 'Choose a date before today.'
+  return validateAgenda(draft.slots)
 }

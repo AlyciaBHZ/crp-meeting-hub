@@ -25,6 +25,10 @@ describe('meeting access', () => {
       { object_path: 'meeting-1/minutes', original_name: 'minutes.pdf' },
       { zoom_url: 'https://zoom.us/j/123' },
       { 'group-1': ['member-1', 'member-2'] },
+      [{
+        id: 'archive-1', meeting_id: 'meeting-1', group_id: 'group-1', object_path: 'meeting-1/group-1/archive-1.pdf',
+        original_name: 'analysis.pdf', size_bytes: 2048, uploaded_at: '2026-09-02T01:00:00Z',
+      }],
     )
 
     expect(result.date).toBe('1 Sept 2026')
@@ -35,5 +39,8 @@ describe('meeting access', () => {
     }))
     expect(result.zoomUrl).toBe('https://zoom.us/j/123')
     expect(result.minutesFileName).toBe('minutes.pdf')
+    expect(result.archiveFiles).toEqual([expect.objectContaining({
+      id: 'archive-1', groupId: 'group-1', groupName: "Prof Zhang Yang's group", originalName: 'analysis.pdf',
+    })])
   })
 })

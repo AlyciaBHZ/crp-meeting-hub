@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, CalendarPlus, Save, UserPlus, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
-import type { AgendaDraftSlot, Meeting, MeetingDraft, ResearchGroup } from '../data/meeting'
-import { buildAgendaDraft, validateMeetingDraft } from '../services/meetingLifecycle'
+import type { AgendaDraftSlot, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup } from '../data/meeting'
+import { buildAgendaDraft, getSingaporeTodayISO, validateHistoricalMeetingDraft, validateMeetingDraft } from '../services/meetingLifecycle'
 
 export interface ProfileRecord {
   id: string
@@ -17,18 +17,29 @@ interface AdminPanelProps {
   onAddMember: (email: string, role: 'presenter' | 'admin') => Promise<void>
   onCreateMeeting: (draft: MeetingDraft) => Promise<void>
   onUpdateMeeting: (meetingId: string, draft: MeetingDraft) => Promise<void>
+  onRegisterHistoricalMeeting: (draft: HistoricalMeetingDraft) => Promise<void>
   onCreateGroup: (name: string) => Promise<void>
   onUpdateGroup: (groupId: string, updates: { name?: string; active?: boolean }) => Promise<void>
   onSetGroupMember: (groupId: string, profileId: string, enabled: boolean) => Promise<void>
 }
 
-function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting }: Pick<AdminPanelProps, 'groups' | 'meetings' | 'onCreateMeeting' | 'onUpdateMeeting'>) {
+function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, onRegisterHistoricalMeeting }: Pick<AdminPanelProps, 'groups' | 'meetings' | 'onCreateMeeting' | 'onUpdateMeeting' | 'onRegisterHistoricalMeeting'>) {
+  const [mode, setMode] = useState<'upcoming' | 'past'>('upcoming')
   const [editingMeetingId, setEditingMeetingId] = useState('')
   const [date, setDate] = useState('')
   const [zoomUrl, setZoomUrl] = useState('')
   const [slots, setSlots] = useState<AgendaDraftSlot[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  function changeMode(nextMode: 'upcoming' | 'past') {
+    setMode(nextMode)
+    setEditingMeetingId('')
+    setDate('')
+    setZoomUrl('')
+    setSlots([])
+    setMessage(null)
+  }
 
   function selectMeeting(meetingId: string) {
     setEditingMeetingId(meetingId)
@@ -84,8 +95,11 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting }: 
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    const draft = { date, zoomUrl: zoomUrl.trim(), slots }
-    const validationError = validateMeetingDraft(draft)
+    const meetingDraft = { date, zoomUrl: zoomUrl.trim(), slots }
+    const historicalDraft = { date, slots }
+    const validationError = mode === 'past'
+      ? validateHistoricalMeetingDraft(historicalDraft, getSingaporeTodayISO())
+      : validateMeetingDraft(meetingDraft)
     if (validationError) {
       setMessage(validationError)
       return
@@ -93,16 +107,18 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting }: 
     setPending(true)
     setMessage(null)
     try {
-      if (editingMeetingId) {
-        await onUpdateMeeting(editingMeetingId, draft)
+      if (mode === 'past') {
+        await onRegisterHistoricalMeeting(historicalDraft)
+      } else if (editingMeetingId) {
+        await onUpdateMeeting(editingMeetingId, meetingDraft)
       } else {
-        await onCreateMeeting(draft)
+        await onCreateMeeting(meetingDraft)
       }
       setEditingMeetingId('')
       setDate('')
       setZoomUrl('')
       setSlots([])
-      setMessage(editingMeetingId ? 'Meeting updated.' : 'Meeting created.')
+      setMessage(mode === 'past' ? 'Past meeting registered.' : editingMeetingId ? 'Meeting updated.' : 'Meeting created.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to create the meeting.')
     } finally {
@@ -113,20 +129,28 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting }: 
   return (
     <section className="admin-workspace-section" aria-labelledby="create-meeting-heading">
       <div className="admin-subheading">
-        <div><p className="eyebrow">Online schedule</p><h3 id="create-meeting-heading">{editingMeetingId ? 'Edit meeting' : 'Create meeting'}</h3></div>
+        <div><p className="eyebrow">Online schedule</p><h3 id="create-meeting-heading">{mode === 'past' ? 'Register past meeting' : editingMeetingId ? 'Edit meeting' : 'Create meeting'}</h3></div>
         <CalendarPlus aria-hidden="true" size={20} />
+      </div>
+      <div className="meeting-mode-tabs" aria-label="Meeting type">
+        <button type="button" className={mode === 'upcoming' ? 'active' : ''} onClick={() => changeMode('upcoming')}>Upcoming meeting</button>
+        <button type="button" className={mode === 'past' ? 'active' : ''} onClick={() => changeMode('past')}>Past meeting</button>
       </div>
       <form className="meeting-builder" onSubmit={submit}>
         <div className="meeting-core-fields">
-          <label htmlFor="meeting-to-manage">Meeting to manage</label>
-          <select id="meeting-to-manage" value={editingMeetingId} onChange={(event) => selectMeeting(event.target.value)}>
-            <option value="">Create a new meeting</option>
-            {meetings.map((meeting) => <option key={meeting.id} value={meeting.id}>{meeting.date ?? meeting.title}</option>)}
-          </select>
-          <label htmlFor="new-meeting-date">Meeting date</label>
-          <input id="new-meeting-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
-          <label htmlFor="new-meeting-zoom">Zoom link</label>
-          <input id="new-meeting-zoom" type="url" required placeholder="https://zoom.us/j/..." value={zoomUrl} onChange={(event) => setZoomUrl(event.target.value)} />
+          {mode === 'upcoming' && <>
+            <label htmlFor="meeting-to-manage">Meeting to manage</label>
+            <select id="meeting-to-manage" value={editingMeetingId} onChange={(event) => selectMeeting(event.target.value)}>
+              <option value="">Create a new meeting</option>
+              {meetings.map((meeting) => <option key={meeting.id} value={meeting.id}>{meeting.date ?? meeting.title}</option>)}
+            </select>
+          </>}
+          <label htmlFor="new-meeting-date">{mode === 'past' ? 'Past meeting date' : 'Meeting date'}</label>
+          <input id="new-meeting-date" type="date" required max={mode === 'past' ? getSingaporeTodayISO() : undefined} value={date} onChange={(event) => setDate(event.target.value)} />
+          {mode === 'upcoming' && <>
+            <label htmlFor="new-meeting-zoom">Zoom link</label>
+            <input id="new-meeting-zoom" type="url" required placeholder="https://zoom.us/j/..." value={zoomUrl} onChange={(event) => setZoomUrl(event.target.value)} />
+          </>}
         </div>
 
         <fieldset className="group-picker">
@@ -164,7 +188,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting }: 
 
         <div className="form-command-row">
           <button className="upload-button" type="submit" disabled={pending}>
-            <CalendarPlus aria-hidden="true" size={17} /> {pending ? 'Saving...' : editingMeetingId ? 'Save meeting' : 'Create meeting'}
+            <CalendarPlus aria-hidden="true" size={17} /> {pending ? 'Saving...' : mode === 'past' ? 'Register past meeting' : editingMeetingId ? 'Save meeting' : 'Create meeting'}
           </button>
           {message && <p className="member-message" role="status">{message}</p>}
         </div>
@@ -293,6 +317,7 @@ export function AdminPanel(props: AdminPanelProps) {
         meetings={props.meetings}
         onCreateMeeting={props.onCreateMeeting}
         onUpdateMeeting={props.onUpdateMeeting}
+        onRegisterHistoricalMeeting={props.onRegisterHistoricalMeeting}
       />
       <GroupManager {...props} />
       <MemberManager profiles={props.profiles} onAddMember={props.onAddMember} />

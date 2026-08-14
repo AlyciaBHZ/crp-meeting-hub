@@ -18,6 +18,9 @@ const pastMeeting: Meeting = {
   }],
   minutesFileName: 'minutes.pdf',
   minutesObjectPath: 'meeting-past/minutes',
+  archiveFiles: [
+    { id: 'file-1', meetingId: 'meeting-past', groupId: 'group-1', groupName: 'Group 1', originalName: 'results.pdf', objectPath: 'meeting-past/group-1/file-1.pdf', sizeBytes: 1024, uploadedAt: '2026-06-15T01:00:00Z' },
+  ],
 }
 
 const callbacks = {
@@ -25,6 +28,8 @@ const callbacks = {
   onDownloadSlides: vi.fn(() => Promise.resolve()),
   onUploadMinutes: vi.fn(() => Promise.resolve()),
   onDownloadMinutes: vi.fn(() => Promise.resolve()),
+  onUploadArchiveFiles: vi.fn(() => Promise.resolve()),
+  onDownloadArchiveFile: vi.fn(() => Promise.resolve()),
 }
 
 describe('MeetingCollection', () => {
@@ -54,5 +59,27 @@ describe('MeetingCollection', () => {
   it('shows a useful empty state when no meeting is scheduled', () => {
     render(<MeetingCollection {...callbacks} view="upcoming" meetings={[]} profile={null} />)
     expect(screen.getByText('No online meeting is scheduled yet.')).toBeInTheDocument()
+  })
+
+  it('shows Lab PDF archives only to signed-in members', () => {
+    const { rerender } = render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={null} />)
+    expect(screen.queryByText('Lab PDF archive')).not.toBeInTheDocument()
+    expect(screen.queryByText('results.pdf')).not.toBeInTheDocument()
+
+    rerender(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
+    expect(screen.getByText('Lab PDF archive')).toBeInTheDocument()
+    expect(screen.getByText('results.pdf')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Group 1' })).toBeInTheDocument()
+  })
+
+  it('lets an administrator upload for every participating Lab', () => {
+    const meeting = {
+      ...pastMeeting,
+      slots: [...pastMeeting.slots, { id: 'slot-2', startsAt: '09:20', endsAt: '09:40', groupName: 'Group 2', groupId: 'group-2', groupMemberIds: [], slideStatus: 'awaiting' as const }],
+    }
+    render(<MeetingCollection {...callbacks} view="archive" meetings={[meeting]} profile={{ id: 'admin-1', role: 'admin' }} />)
+
+    expect(screen.getByRole('option', { name: 'Group 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Group 2' })).toBeInTheDocument()
   })
 })

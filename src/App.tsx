@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminPanel, type ProfileRecord } from './components/AdminPanel'
 import { AuthPanel } from './components/AuthPanel'
 import { MeetingCollection } from './components/MeetingCollection'
-import type { AgendaSlot, Meeting, MeetingDraft, ResearchGroup } from './data/meeting'
+import type { AgendaSlot, ArchiveLabFile, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup } from './data/meeting'
 import { upcomingMeeting } from './data/meeting'
 import type { MemberProfile } from './services/meetingAccess'
 import { isSharedLogin, resolveLoginIdentity } from './services/loginIdentity'
@@ -112,7 +112,7 @@ export default function App() {
     await loadMeetings()
   }
 
-  async function download(bucket: 'slides' | 'minutes', path?: string) {
+  async function download(bucket: 'slides' | 'minutes' | 'archive-lab-files', path?: string) {
     if (!repository || !path) return
     window.location.assign(await repository.getDownloadUrl(bucket, path))
   }
@@ -169,6 +169,14 @@ export default function App() {
             await loadMeetings()
           } : undefined}
           onDownloadMinutes={user && profile ? (meeting) => download('minutes', meeting.minutesObjectPath) : undefined}
+          onUploadArchiveFiles={user && profile && repository ? async (meeting, groupId, files) => {
+            try {
+              for (const file of files) await repository.uploadArchiveLabFile(meeting.id, groupId, file)
+            } finally {
+              await loadMeetings()
+            }
+          } : undefined}
+          onDownloadArchiveFile={user && profile ? (_meeting, file: ArchiveLabFile) => download('archive-lab-files', file.objectPath) : undefined}
         />
 
         {isAdmin && repository && (
@@ -188,6 +196,11 @@ export default function App() {
             onUpdateMeeting={async (meetingId, draft) => {
               await repository.updateMeetingSchedule(meetingId, draft)
               await loadMeetings()
+            }}
+            onRegisterHistoricalMeeting={async (draft: HistoricalMeetingDraft) => {
+              await repository.registerHistoricalMeeting(draft)
+              await loadMeetings()
+              setView('archive')
             }}
             onCreateGroup={async (name) => {
               await repository.createGroup(name)

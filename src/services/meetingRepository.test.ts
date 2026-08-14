@@ -28,17 +28,63 @@ describe('meetingRepository', () => {
       resources: [],
       meeting_private_details: [{ meeting_id: 'future', zoom_url: 'https://zoom.us/j/123' }],
       group_members: [{ group_id: 'group-1', profile_id: 'member-1' }],
+      archive_lab_files: [{
+        id: 'file-1', meeting_id: 'past', group_id: 'group-1', original_name: 'paper.pdf',
+        object_path: 'past/group-1/file-1.pdf', size_bytes: 100, uploaded_at: '2026-06-15T01:00:00Z',
+      }],
     } as Record<string, unknown[]>
     const from = vi.fn((table: string) => queryResult(rows[table]))
     const repository = createMeetingRepository({ from } as never)
 
     await expect(repository.getMeetings('2026-08-14')).resolves.toEqual(expect.objectContaining({
       upcoming: [expect.objectContaining({ id: 'future', zoomUrl: 'https://zoom.us/j/123' })],
-      archive: [expect.objectContaining({ id: 'past' })],
+      archive: [expect.objectContaining({ id: 'past', archiveFiles: [expect.objectContaining({ originalName: 'paper.pdf' })] })],
     }))
     expect(from).toHaveBeenCalledWith('meetings')
     expect(from).toHaveBeenCalledWith('agenda_slots')
     expect(from).toHaveBeenCalledWith('meeting_private_details')
+  })
+
+  it('registers a past meeting without a Zoom link', async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: 'meeting-past', error: null }))
+    const repository = createMeetingRepository({ rpc } as never)
+
+    await expect(repository.registerHistoricalMeeting({
+      date: '2026-06-14',
+      slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 }],
+    })).resolves.toBe('meeting-past')
+
+    expect(rpc).toHaveBeenCalledWith('register_historical_meeting', {
+      meeting_date_input: '2026-06-14',
+      slots_input: [{ group_id: 'group-1', starts_at: '09:00', ends_at: '09:20', sort_order: 1 }],
+    })
+  })
+
+  it('reserves archive metadata before uploading a PDF to the private Lab bucket', async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: { id: 'file-1', object_path: 'meeting-1/group-1/file-1.pdf' }, error: null,
+    }))
+    const upload = vi.fn(() => Promise.resolve({ data: { path: 'meeting-1/group-1/file-1.pdf' }, error: null }))
+    const repository = createMeetingRepository({ rpc, storage: { from: vi.fn(() => ({ upload })) } } as never)
+    const file = new File(['pdf'], 'results.pdf', { type: 'application/pdf' })
+
+    await expect(repository.uploadArchiveLabFile('meeting-1', 'group-1', file)).resolves.toBe('meeting-1/group-1/file-1.pdf')
+    expect(rpc).toHaveBeenCalledWith('reserve_archive_lab_file', {
+      meeting_id_input: 'meeting-1', group_id_input: 'group-1', original_name_input: 'results.pdf', size_bytes_input: file.size,
+    })
+    expect(upload).toHaveBeenCalledWith('meeting-1/group-1/file-1.pdf', file, { contentType: 'application/pdf', upsert: false })
+  })
+
+  it('cancels only the unused reservation when an archive upload fails', async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { id: 'file-1', object_path: 'meeting-1/group-1/file-1.pdf' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+    const upload = vi.fn(() => Promise.resolve({ data: null, error: { message: 'Storage unavailable' } }))
+    const repository = createMeetingRepository({ rpc, storage: { from: vi.fn(() => ({ upload })) } } as never)
+
+    await expect(repository.uploadArchiveLabFile('meeting-1', 'group-1', new File(['pdf'], 'results.pdf')))
+      .rejects.toThrow('Storage unavailable')
+    expect(rpc).toHaveBeenLastCalledWith('cancel_archive_lab_file', { file_id_input: 'file-1' })
   })
 
   it('creates complete meetings through the transactional database function', async () => {
@@ -115,7 +161,7 @@ describe('meetingRepository', () => {
     const createSignedUrl = vi.fn(() => Promise.resolve({ data: { signedUrl: 'https://signed.example/file' }, error: null }))
     const repository = createMeetingRepository({ storage: { from: vi.fn(() => ({ createSignedUrl })) } } as never)
 
-    await expect(repository.getDownloadUrl('slides', 'slot-1/slides.pdf')).resolves.toBe('https://signed.example/file')
+    await expect(repository.getDownloadUrl('archive-lab-files', 'slot-1/slides.pdf')).resolves.toBe('https://signed.example/file')
     expect(createSignedUrl).toHaveBeenCalledWith('slot-1/slides.pdf', 60)
   })
 

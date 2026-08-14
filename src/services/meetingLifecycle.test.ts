@@ -4,6 +4,7 @@ import {
   buildAgendaDraft,
   classifyMeetingDate,
   getSingaporeTodayISO,
+  validateHistoricalMeetingDraft,
   validateMeetingDraft,
 } from './meetingLifecycle'
 
@@ -57,6 +58,15 @@ describe('meeting lifecycle', () => {
       date: '2026-10-14', zoomUrl: 'https://zoom.us/j/123',
       slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 }],
     })).toBeNull()
+  })
+
+  it('accepts a past meeting without Zoom and rejects today or future dates', () => {
+    const draft = {
+      date: '2026-06-14',
+      slots: [{ groupId: 'group-1', groupName: 'Group 1', startsAt: '09:00', endsAt: '09:20', sortOrder: 1 }],
+    }
+    expect(validateHistoricalMeetingDraft(draft, '2026-08-14')).toBeNull()
+    expect(validateHistoricalMeetingDraft({ ...draft, date: '2026-08-14' }, '2026-08-14')).toBe('Choose a date before today.')
   })
 })
 

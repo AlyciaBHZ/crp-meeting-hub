@@ -18,6 +18,7 @@ const baseProps = {
   onAddMember: vi.fn(() => Promise.resolve()),
   onCreateMeeting: vi.fn(() => Promise.resolve()),
   onUpdateMeeting: vi.fn(() => Promise.resolve()),
+  onRegisterHistoricalMeeting: vi.fn(() => Promise.resolve()),
   onCreateGroup: vi.fn(() => Promise.resolve()),
   onUpdateGroup: vi.fn(() => Promise.resolve()),
   onSetGroupMember: vi.fn(() => Promise.resolve()),
@@ -51,6 +52,24 @@ describe('AdminPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add group' }))
 
     expect(onCreateGroup).toHaveBeenCalledWith('Prof New Group')
+  })
+
+  it('registers a past meeting with an agenda and no Zoom link', async () => {
+    const onRegisterHistoricalMeeting = vi.fn(() => Promise.resolve())
+    render(<AdminPanel {...baseProps} onRegisterHistoricalMeeting={onRegisterHistoricalMeeting} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Past meeting' }))
+    await userEvent.type(screen.getByLabelText('Past meeting date'), '2026-06-14')
+    await userEvent.click(screen.getByLabelText("Select Prof Zhang Yang's group"))
+    await userEvent.click(screen.getByRole('button', { name: 'Register past meeting' }))
+
+    expect(screen.queryByLabelText('Zoom link')).not.toBeInTheDocument()
+    expect(onRegisterHistoricalMeeting).toHaveBeenCalledWith({
+      date: '2026-06-14',
+      slots: [{
+        groupId: 'group-1', groupName: "Prof Zhang Yang's group", startsAt: '09:00', endsAt: '09:20', sortOrder: 1,
+      }],
+    })
   })
 
   it('loads and updates an existing future meeting', async () => {

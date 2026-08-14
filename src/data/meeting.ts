@@ -35,6 +35,22 @@ export interface MeetingDraft {
   slots: AgendaDraftSlot[]
 }
 
+export interface HistoricalMeetingDraft {
+  date: string
+  slots: AgendaDraftSlot[]
+}
+
+export interface ArchiveLabFile {
+  id: string
+  meetingId: string
+  groupId: string
+  groupName: string
+  originalName: string
+  objectPath: string
+  sizeBytes: number
+  uploadedAt: string
+}
+
 export interface Meeting {
   id: string
   title: string
@@ -48,6 +64,7 @@ export interface Meeting {
   minutesFileName?: string
   minutesObjectPath?: string
   zoomUrl?: string
+  archiveFiles?: ArchiveLabFile[]
 }
 
 export const upcomingMeeting: Meeting = {
