@@ -1,5 +1,5 @@
-import { CalendarDays, CalendarPlus, Clock3, Pencil, Users, Video } from 'lucide-react'
-import { useId } from 'react'
+import { CalendarDays, CalendarPlus, ChevronDown, ChevronUp, Clock3, Pencil, Users, Video } from 'lucide-react'
+import { useId, useRef, useState } from 'react'
 import type { AgendaSlot, ArchiveLabFile, Meeting, SlideFile } from '../data/meeting'
 import { canManageSlot, type MemberProfile } from '../services/meetingAccess'
 import type { MeetingView } from '../services/meetingLifecycle'
@@ -21,88 +21,124 @@ interface MeetingCollectionProps {
   onManageGroups?: () => void
 }
 
-function meetingTime(meeting: Meeting) {
-  if (!meeting.slots.length) return 'Schedule pending'
-  return `${meeting.slots.map((slot) => slot.startsAt).sort()[0]} - ${meeting.slots.map((slot) => slot.endsAt).sort().at(-1)}`
+function firstTime(meeting: Meeting) {
+  return meeting.slots.map((slot) => slot.startsAt).sort()[0] ?? ''
 }
 
-export function MeetingCollection({
-  view,
-  meetings,
-  profile,
-  onUploadSlides,
-  onDownloadSlides,
-  onRemoveSlides,
-  onUploadMinutes,
-  onDownloadMinutes,
-  onDownloadArchiveFile,
-  onCreateMeeting,
-  onEditMeeting,
-  onManageGroups,
-}: MeetingCollectionProps) {
+function meetingTime(meeting: Meeting) {
+  if (!meeting.slots.length) return 'Schedule pending'
+  return firstTime(meeting) + ' - ' + meeting.slots.map((slot) => slot.endsAt).sort().at(-1)
+}
+
+interface MeetingCardProps extends Omit<MeetingCollectionProps, 'meetings'> {
+  meeting: Meeting
+  index: number
+}
+
+function MeetingCard({
+  meeting, index, view, profile, onEditMeeting, onUploadSlides, onDownloadSlides,
+  onRemoveSlides, onUploadMinutes, onDownloadMinutes, onDownloadArchiveFile,
+}: MeetingCardProps) {
+  const headingId = useId()
+  const detailsId = useId()
+  const dateId = useId()
+  const [expanded, setExpanded] = useState(index === 0)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  const isAdmin = profile?.role === 'admin'
+
+  function collapseFromBottom() {
+    setExpanded(false)
+    toggleRef.current?.focus({ preventScroll: true })
+    headerRef.current?.scrollIntoView?.({
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    })
+  }
+
+  return (
+    <article className={'meeting-entry' + (expanded ? '' : ' meeting-entry-collapsed')} aria-labelledby={headingId + ' ' + dateId}>
+      <header className="meeting-entry-header" ref={headerRef}>
+        <div>
+          <p className="meeting-sequence">{view === 'upcoming' && index === 0 ? 'Next meeting' : view === 'archive' ? 'Past meeting' : 'Upcoming meeting'}</p>
+          <h2 id={headingId}>{meeting.title}</h2>
+        </div>
+        <dl className="online-meeting-facts">
+          <div><dt><CalendarDays aria-hidden="true" size={16} /> Date</dt><dd id={dateId}>{meeting.date ?? 'Pending'}</dd></div>
+          <div><dt><Clock3 aria-hidden="true" size={16} /> Time</dt><dd>{meetingTime(meeting)}</dd></div>
+        </dl>
+        <div className="meeting-entry-actions">
+          {isAdmin && view === 'upcoming' && onEditMeeting && <button type="button" className="secondary-button" onClick={() => onEditMeeting(meeting)}><Pencil aria-hidden="true" size={16} /> Edit meeting</button>}
+          {view === 'upcoming' && profile && meeting.zoomUrl && (
+            <a className="zoom-link" href={meeting.zoomUrl} target="_blank" rel="noreferrer">
+              <Video aria-hidden="true" size={17} /> Open Zoom meeting
+            </a>
+          )}
+          <button ref={toggleRef} className="meeting-toggle" type="button" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(!expanded)}>
+            {expanded ? <ChevronUp aria-hidden="true" size={18} /> : <ChevronDown aria-hidden="true" size={18} />}
+            {expanded ? 'Collapse meeting' : 'Expand meeting'}
+          </button>
+        </div>
+      </header>
+
+      <Resources
+        meeting={meeting}
+        compact
+        isPast={view === 'archive'}
+        isAdmin={isAdmin}
+        onUpload={isAdmin && onUploadMinutes ? (file) => onUploadMinutes(meeting, file) : undefined}
+        onDownload={profile && meeting.minutesObjectPath && onDownloadMinutes ? () => onDownloadMinutes(meeting) : undefined}
+      />
+
+      <div id={detailsId} className="meeting-details" hidden={!expanded}>
+        <Agenda
+          meeting={meeting}
+          profile={profile}
+          canUpload={(slot) => canManageSlot(profile, slot)}
+          onUpload={onUploadSlides ? (slot, displayName, file) => onUploadSlides(meeting, slot, displayName, file) : undefined}
+          onDownload={profile && onDownloadSlides ? (file) => onDownloadSlides(meeting, file) : undefined}
+          onRemove={profile && onRemoveSlides ? (file) => onRemoveSlides(meeting, file) : undefined}
+          onDownloadArchiveFile={profile && onDownloadArchiveFile ? (file) => onDownloadArchiveFile(meeting, file) : undefined}
+        />
+        <div className="meeting-collapse-footer">
+          <button type="button" className="secondary-button" aria-expanded={expanded} aria-controls={detailsId} onClick={collapseFromBottom}>
+            <ChevronUp aria-hidden="true" size={18} /> Collapse and back to meeting
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+export function MeetingCollection(props: MeetingCollectionProps) {
+  const { view, meetings, profile, onCreateMeeting, onManageGroups } = props
   const headingId = useId()
   const isAdmin = profile?.role === 'admin'
   const title = view === 'upcoming' ? 'Upcoming meetings' : 'Past meetings'
-  const emptyMessage = view === 'upcoming'
-    ? 'No online meeting is scheduled yet.'
-    : 'No past meetings are available.'
+  const emptyMessage = view === 'upcoming' ? 'No online meeting is scheduled yet.' : 'No past meetings are available.'
+  const sortedMeetings = [...meetings].sort((a, b) => {
+    if (!a.dateISO || !b.dateISO) return a.dateISO ? -1 : b.dateISO ? 1 : 0
+    const order = a.dateISO.localeCompare(b.dateISO) || firstTime(a).localeCompare(firstTime(b))
+    return view === 'archive' ? -order : order
+  })
 
   return (
     <section className="meeting-collection" aria-labelledby={headingId}>
       <header className="collection-heading">
         <div>
-        <p className="eyebrow">CRP online meetings</p>
-        <h1 id={headingId}>{title}</h1>
+          <p className="eyebrow">CRP online meetings</p>
+          <h1 id={headingId}>{title}</h1>
+          {view === 'archive' && meetings.length > 0 && <p className="collection-description">Newest first. Expand a meeting for its agenda and group PDFs.</p>}
         </div>
         {isAdmin && <div className="collection-actions">
           {onManageGroups && <button type="button" className="secondary-button" onClick={onManageGroups}><Users aria-hidden="true" size={17} /> Groups and members</button>}
           {onCreateMeeting && <button type="button" className="upload-button" onClick={onCreateMeeting}><CalendarPlus aria-hidden="true" size={17} /> {view === 'upcoming' ? 'New meeting' : 'Add past meeting'}</button>}
         </div>}
       </header>
-
       {!meetings.length && <p className="empty-state">{emptyMessage}</p>}
-
-      {meetings.map((meeting, index) => {
-        const meetingHeadingId = `${headingId}-${meeting.id}`
-        return (
-          <article className="meeting-entry" key={meeting.id} aria-labelledby={meetingHeadingId}>
-            <header className="meeting-entry-header">
-              <div>
-                <p className="meeting-sequence">{view === 'upcoming' && index === 0 ? 'Next meeting' : view === 'archive' ? 'Past meeting' : 'Upcoming meeting'}</p>
-                <h2 id={meetingHeadingId}>{meeting.title}</h2>
-              </div>
-              <dl className="online-meeting-facts">
-                <div><dt><CalendarDays aria-hidden="true" size={16} /> Date</dt><dd>{meeting.date ?? 'Pending'}</dd></div>
-                <div><dt><Clock3 aria-hidden="true" size={16} /> Time</dt><dd>{meetingTime(meeting)}</dd></div>
-              </dl>
-              <div className="meeting-entry-actions">
-              {isAdmin && view === 'upcoming' && onEditMeeting && <button type="button" className="secondary-button" onClick={() => onEditMeeting(meeting)}><Pencil aria-hidden="true" size={16} /> Edit meeting</button>}
-              {view === 'upcoming' && profile && meeting.zoomUrl && (
-                <a className="zoom-link" href={meeting.zoomUrl} target="_blank" rel="noreferrer">
-                  <Video aria-hidden="true" size={17} /> Open Zoom meeting
-                </a>
-              )}
-              </div>
-            </header>
-
-            <Agenda
-              meeting={meeting}
-              profile={profile}
-              canUpload={(slot) => canManageSlot(profile, slot)}
-              onUpload={onUploadSlides ? (slot, displayName, file) => onUploadSlides(meeting, slot, displayName, file) : undefined}
-              onDownload={profile && onDownloadSlides ? (file) => onDownloadSlides(meeting, file) : undefined}
-              onRemove={profile && onRemoveSlides ? (file) => onRemoveSlides(meeting, file) : undefined}
-              onDownloadArchiveFile={profile && onDownloadArchiveFile ? (file) => onDownloadArchiveFile(meeting, file) : undefined}
-            />
-            <Resources
-              meeting={meeting}
-              isAdmin={isAdmin}
-              onUpload={isAdmin && onUploadMinutes ? (file) => onUploadMinutes(meeting, file) : undefined}
-              onDownload={profile && meeting.minutesObjectPath && onDownloadMinutes ? () => onDownloadMinutes(meeting) : undefined}
-            />
-          </article>
-        )
-      })}
+      {sortedMeetings.map((meeting, index) => (
+        <MeetingCard {...props} key={view + '-' + meeting.id} meeting={meeting} index={index} />
+      ))}
     </section>
   )
 }

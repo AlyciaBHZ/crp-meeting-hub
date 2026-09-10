@@ -181,6 +181,18 @@ h1 { font-size: 3.5rem; line-height: 1.08; margin: 0; }
 .meeting-entry .agenda-section, .meeting-entry .resources-section, .meeting-entry .archive-files-section { margin: 0; max-width: none; padding-left: 0; padding-right: 0; }
 .meeting-entry .agenda-section { padding-top: 28px; }
 .meeting-entry .resources-section { padding-bottom: 42px; padding-top: 30px; }
+.meeting-entry .compact-minutes { padding-top: 0; padding-bottom: 0; }
+.compact-minutes .minutes-row { border-top: 0; }
+.meeting-entry-collapsed { padding-bottom: 0; }
+.meeting-details[hidden] { display: none; }
+.meeting-entry-header { scroll-margin-top: 120px; }
+.meeting-toggle { align-items: center; background: transparent; border: 1px solid #8aafa1; border-radius: 5px; color: white; display: inline-flex; font-size: 0.78rem; font-weight: 700; gap: 7px; min-height: 40px; padding: 0 12px; }
+.meeting-toggle:hover { background: #264b3f; }
+.meeting-toggle:focus-visible { outline: 3px solid #f1c869; outline-offset: 3px; }
+.meeting-collapse-footer { display: flex; justify-content: center; padding: 20px 0 12px; }
+.collection-description { color: #69746f; font-size: 0.82rem; line-height: 1.5; margin: 10px 0 0; }
+.online-meeting-facts > div:first-child dd { font-size: 1rem; white-space: nowrap; }
+.resource-copy { min-width: 0; overflow-wrap: anywhere; }
 
 .agenda-section, .resources-section, .admin-section {
   margin: 0 auto;

@@ -30,6 +30,9 @@ npm run build
 - Private PDF, DOCX, and Markdown meeting-minutes uploads up to 50 MB
 - 60-second signed download links
 - Automatic archive placement based on the Singapore calendar date
+- Archive cards ordered newest first, with the latest meeting expanded initially
+- Expand/collapse controls for each meeting, plus a bottom collapse action that returns to its header
+- Independent minutes status, upload/replace, and download controls remain visible even when a meeting is collapsed
 - Administrator registration of past meetings without obsolete Zoom links
 - A single PDF list inside each group's agenda card, including previously uploaded Archive files
 - One combined 20-PDF limit per group per meeting, enforced across both storage collections
