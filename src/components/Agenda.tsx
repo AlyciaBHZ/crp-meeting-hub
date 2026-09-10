@@ -3,6 +3,11 @@ import { useId } from 'react'
 import type { AgendaSlot, ArchiveLabFile, Meeting, SlideFile } from '../data/meeting'
 import type { MemberProfile } from '../services/meetingAccess'
 import { SlideFilesControl } from './SlideFilesControl'
+import { Discussion } from './Discussion'
+import { ShareLink } from './ShareLink'
+import { meetingGroupAnchor } from '../services/meetingLinks'
+import type { DiscussionRepository } from '../services/discussionRepository'
+import type { PdfResource } from '../data/discussion'
 
 function formatTime(time: string) {
   const [hours, minutes] = time.split(':').map(Number)
@@ -14,6 +19,8 @@ function formatTime(time: string) {
 interface AgendaProps {
   meeting: Meeting
   profile: MemberProfile | null
+  discussionRepository?: DiscussionRepository
+  onPreview?: (resource: PdfResource) => void
   canUpload?: (slot: AgendaSlot) => boolean
   onUpload?: (slot: AgendaSlot, displayName: string, file: File) => Promise<void>
   onDownload?: (file: SlideFile) => Promise<void>
@@ -21,7 +28,7 @@ interface AgendaProps {
   onDownloadArchiveFile?: (file: ArchiveLabFile) => Promise<void>
 }
 
-export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onDownload, onRemove, onDownloadArchiveFile }: AgendaProps) {
+export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onDownload, onRemove, onDownloadArchiveFile, discussionRepository, onPreview }: AgendaProps) {
   const headingId = useId()
   return (
     <section className="agenda-section" aria-labelledby={headingId}>
@@ -38,7 +45,7 @@ export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onD
           const archiveFiles = profile ? meeting.archiveFiles?.filter((file) => file.groupId === slot.groupId) ?? [] : []
           const count = (profile ? slot.slideFiles?.length ?? 0 : 0) + archiveFiles.length
           return (
-          <li className="agenda-row" key={slot.id}>
+          <li className="agenda-row" key={slot.id} id={meetingGroupAnchor(meeting.id, slot.groupId ?? slot.id)} tabIndex={-1}>
             <div className="agenda-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
             <time className="agenda-time" dateTime={slot.startsAt}>
               <strong>{formatTime(slot.startsAt)}</strong>
@@ -47,6 +54,7 @@ export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onD
             <div className="agenda-group">
               <h3>{slot.groupName}</h3>
               <p>{meeting.presentationMinutes} min presentation / {meeting.qaMinutes} min Q&amp;A</p>
+              <ShareLink meetingId={meeting.id} groupId={slot.groupId ?? slot.id} />
             </div>
             {profile && <div className="agenda-status">
               <span className={`status ${count ? 'uploaded' : 'awaiting'}`}>
@@ -63,7 +71,9 @@ export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onD
               onRemove={onRemove}
               archiveFiles={archiveFiles}
               onDownloadArchiveFile={onDownloadArchiveFile}
+              onPreview={onPreview}
             />
+            {profile && discussionRepository && <Discussion key={profile.id + profile.role} slot={slot} archiveFiles={archiveFiles} profile={profile} repository={discussionRepository} onPreview={onPreview} />}
           </li>
         )})}
       </ol>

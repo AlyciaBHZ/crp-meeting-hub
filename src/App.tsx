@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { Archive, CalendarDays, Cloud, CloudOff, FolderKanban } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminPanel, type ProfileRecord } from './components/AdminPanel'
 import { AuthPanel } from './components/AuthPanel'
 import { MeetingCollection } from './components/MeetingCollection'
@@ -11,6 +11,11 @@ import { isSharedLogin, resolveLoginIdentity } from './services/loginIdentity'
 import { getSingaporeTodayISO, type MeetingView } from './services/meetingLifecycle'
 import { createMeetingRepository } from './services/meetingRepository'
 import { isSupabaseConfigured, supabase } from './services/supabaseClient'
+import { createDiscussionRepository } from './services/discussionRepository'
+import { passwordSetupLink, readMeetingTarget } from './services/meetingLinks'
+import type { PdfResource } from './data/discussion'
+
+const PdfPreview = lazy(() => import('./components/PdfPreview'))
 
 const localGroups: ResearchGroup[] = upcomingMeeting.slots.map((slot, index) => ({
   id: `local-group-${index + 1}`,
@@ -25,6 +30,10 @@ export default function App() {
     archive: [],
   })
   const [view, setView] = useState<MeetingView>('upcoming')
+  const [target, setTarget] = useState(() => readMeetingTarget(window.location.search))
+  const [preview, setPreview] = useState<PdfResource | null>(null)
+  const sessionGeneration = useRef(0)
+  const sessionUserId = useRef<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<MemberProfile | null>(null)
   const [groups, setGroups] = useState<ResearchGroup[]>(isSupabaseConfigured ? [] : localGroups)
@@ -36,6 +45,29 @@ export default function App() {
     () => new URLSearchParams(window.location.search).get('password_setup') === '1',
   )
   const repository = useMemo(() => supabase ? createMeetingRepository(supabase) : null, [])
+  const discussionRepository = useMemo(() => supabase ? createDiscussionRepository(supabase) : undefined, [])
+  const loadPdf = useCallback((resource: PdfResource) => repository!.getPdfBlob(resource.bucket, resource.path), [repository])
+
+  function navigate(nextView: MeetingView) {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('meeting')
+    url.searchParams.delete('group')
+    window.history.pushState({}, '', url)
+    setTarget(null)
+    setView(nextView)
+  }
+
+  useEffect(() => {
+    const onPopState = () => setTarget(readMeetingTarget(window.location.search))
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (!target) return
+    if (meetings.archive.some((meeting) => meeting.id === target.meetingId)) setView('archive')
+    else if (meetings.upcoming.some((meeting) => meeting.id === target.meetingId)) setView('upcoming')
+  }, [target, meetings])
 
   const loadMeetings = useCallback(async () => {
     if (!repository) return
@@ -58,12 +90,23 @@ export default function App() {
 
   const hydrateSession = useCallback(async (nextUser: User | null) => {
     if (!repository) return
+    const generation = ++sessionGeneration.current
+    const nextId = nextUser?.id ?? null
+    if (sessionUserId.current !== nextId) {
+      setPreview(null)
+      setProfile(null)
+      setProfiles([])
+      sessionUserId.current = nextId
+    }
     setUser(nextUser)
     const nextProfile = nextUser ? await repository.getProfile(nextUser.id) : null
+    if (generation !== sessionGeneration.current) return
     setProfile(nextProfile)
     await Promise.all([loadMeetings(), loadGroups()])
+    if (generation !== sessionGeneration.current) return
     if (nextProfile?.role === 'admin') {
-      setProfiles(await repository.getProfiles())
+      const nextProfiles = await repository.getProfiles()
+      if (generation === sessionGeneration.current) setProfiles(nextProfiles)
     } else {
       setProfiles([])
     }
@@ -90,11 +133,10 @@ export default function App() {
     if (!supabase) throw new Error('Cloud sign-in is not configured.')
     if (isSharedLogin(identity)) throw new Error('Shared account passwords are managed by the CRP administrator.')
     const email = resolveLoginIdentity(identity)
-    const redirect = new URL(window.location.origin)
-    redirect.searchParams.set('password_setup', '1')
+    const redirect = passwordSetupLink(window.location.href)
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirect.toString(), shouldCreateUser: true },
+      options: { emailRedirectTo: redirect, shouldCreateUser: true },
     })
     if (error) throw error
   }
@@ -105,7 +147,9 @@ export default function App() {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) throw error
     setNeedsPasswordSetup(false)
-    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('password_setup')
+    window.history.replaceState({}, '', url)
   }
 
   async function uploadSlides(_meeting: Meeting, slot: AgendaSlot, displayName: string, file: File) {
@@ -135,15 +179,15 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <button className="brand" type="button" onClick={() => setView('upcoming')} aria-label="CRP Meeting Hub home">
+        <button className="brand" type="button" onClick={() => navigate('upcoming')} aria-label="CRP Meeting Hub home">
           <span className="brand-mark"><FolderKanban aria-hidden="true" size={20} /></span>
           <span>CRP Meeting Hub</span>
         </button>
         <nav aria-label="Meeting views">
-          <button className={view === 'upcoming' ? 'active' : ''} type="button" onClick={() => setView('upcoming')}>
+          <button className={view === 'upcoming' ? 'active' : ''} type="button" onClick={() => navigate('upcoming')}>
             <CalendarDays aria-hidden="true" size={16} /> Upcoming
           </button>
-          <button className={view === 'archive' ? 'active' : ''} type="button" onClick={() => setView('archive')}>
+          <button className={view === 'archive' ? 'active' : ''} type="button" onClick={() => navigate('archive')}>
             <Archive aria-hidden="true" size={16} /> Archive
           </button>
         </nav>
@@ -170,10 +214,14 @@ export default function App() {
           )}
         </div>
 
+        {target && meetings.upcoming.length + meetings.archive.length > 0 && ![...meetings.upcoming, ...meetings.archive].some((meeting) => meeting.id === target.meetingId) && <p role="status">This meeting link is unavailable. Browse the meetings below.</p>}
         <MeetingCollection
           view={view}
           meetings={meetings[view]}
           profile={profile}
+          target={target}
+          discussionRepository={discussionRepository}
+          onPreview={user && profile && repository ? setPreview : undefined}
           onCreateMeeting={() => openAdmin({ mode: view === 'archive' ? 'past' : 'upcoming' })}
           onEditMeeting={(meeting) => openAdmin({ meetingId: meeting.id, mode: 'upcoming' })}
           onManageGroups={() => openAdmin({ mode: 'upcoming', groups: true })}
@@ -231,6 +279,8 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {preview && user && profile && repository && <Suspense fallback={<p role="status">Opening PDF preview… <button type="button" onClick={() => setPreview(null)}>Cancel</button></p>}><PdfPreview key={preview.bucket + preview.path + preview.page} resource={preview} load={loadPdf} onClose={() => setPreview(null)} onDownload={() => download(preview.bucket, preview.path)} /></Suspense>}
 
       <footer>
         <p>CRP Grant Collaboration</p>

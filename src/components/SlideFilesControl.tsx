@@ -3,9 +3,11 @@ import { type FormEvent, useId, useRef, useState } from 'react'
 import type { AgendaSlot, ArchiveLabFile, SlideFile } from '../data/meeting'
 import type { MemberProfile } from '../services/meetingAccess'
 import { MAX_SLIDE_FILES_PER_LAB, validateSlidePdf } from '../uploadValidation'
+import type { PdfResource } from '../data/discussion'
 
 interface SlideFilesControlProps {
   slot: AgendaSlot
+  onPreview?: (resource: PdfResource) => void
   profile: MemberProfile | null
   enabled: boolean
   onUpload?: (slot: AgendaSlot, displayName: string, file: File) => Promise<void>
@@ -20,7 +22,7 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload, onRemove, archiveFiles = [], onDownloadArchiveFile }: SlideFilesControlProps) {
+export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload, onRemove, archiveFiles = [], onDownloadArchiveFile, onPreview }: SlideFilesControlProps) {
   const nameId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [displayName, setDisplayName] = useState('')
@@ -107,6 +109,7 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
               <li key={file.id}>
                 <FileText aria-hidden="true" size={17} />
                 <span><strong>{file.displayName}</strong><small>{file.originalName} - {formatBytes(file.sizeBytes)}</small></span>
+                {onPreview && <button className="secondary-button" type="button" aria-label={`Preview ${file.displayName}`} onClick={() => onPreview({ bucket: 'slides', path: file.objectPath, name: file.originalName })}>Preview</button>}
                 {onDownload && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.displayName}`} onClick={() => void download(() => onDownload(file))}><Download aria-hidden="true" size={16} /></button>}
                 {canRemove && <button className="icon-button danger" type="button" title="Remove PDF" aria-label={`Remove ${file.displayName}`} disabled={pending} onClick={() => void remove(file)}><Trash2 aria-hidden="true" size={16} /></button>}
               </li>
@@ -116,6 +119,7 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
             <li key={`archive-${file.id}`}>
               <FileText aria-hidden="true" size={17} />
               <span><strong>{file.originalName}</strong><small>{formatBytes(file.sizeBytes)}</small></span>
+              {onPreview && <button className="secondary-button" type="button" aria-label={`Preview ${file.originalName}`} onClick={() => onPreview({ bucket: 'archive-lab-files', path: file.objectPath, name: file.originalName })}>Preview</button>}
               {onDownloadArchiveFile && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.originalName}`} onClick={() => void download(() => onDownloadArchiveFile(file))}><Download aria-hidden="true" size={16} /></button>}
             </li>
           ))}
