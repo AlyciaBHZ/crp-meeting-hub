@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Meeting } from '../data/meeting'
@@ -36,6 +36,25 @@ const callbacks = {
 }
 
 describe('MeetingCollection', () => {
+  it('expands and focuses an older linked group without preventing later collapse', async () => {
+    const newest = { ...pastMeeting, id: 'newest', dateISO: '2026-09-01' }
+    const target = { meetingId: pastMeeting.id, groupId: 'group-1' }
+    render(<MeetingCollection view="archive" meetings={[newest, pastMeeting]} profile={null} target={target} />)
+    const cards = screen.getAllByRole('article')
+    expect(within(cards[1]).getByRole('button', { name: 'Collapse meeting' })).toBeVisible()
+    await waitFor(() => expect(document.activeElement?.id).toBe('meeting-meeting-past-group-group-1'))
+    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Collapse meeting' }))
+    expect(within(cards[1]).getByRole('button', { name: 'Expand meeting' })).toBeVisible()
+  })
+
+  it('does not expose discussion or preview actions to signed-out visitors', () => {
+    const repository = { list: vi.fn(), ask: vi.fn(), reply: vi.fn(), setStatus: vi.fn() }
+    render(<MeetingCollection view="archive" meetings={[pastMeeting]} profile={null} discussionRepository={repository} />)
+    expect(screen.queryByRole('button', { name: /Questions & discussion/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Preview/ })).not.toBeInTheDocument()
+    expect(repository.list).not.toHaveBeenCalled()
+  })
+
   it('orders archived meetings newest first and keeps minutes available on collapsed cards', async () => {
     const older = { ...pastMeeting, id: 'older', date: '5 May 2026', dateISO: '2026-05-05', minutesFileName: undefined, minutesObjectPath: undefined }
     const newer = { ...pastMeeting, id: 'newer', date: '5 Aug 2026', dateISO: '2026-08-05' }

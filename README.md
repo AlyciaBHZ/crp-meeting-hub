@@ -63,6 +63,11 @@ The small CRP team uses centrally managed shared member and administrator userna
 2. In Upcoming or Archive, the shared member opens the scheduled group's agenda card, enters a presenter or document name, chooses a PDF, and uploads it.
 3. Each scheduled Lab can hold up to 20 slide PDFs for that meeting. Every PDF is private, limited to 50 MB, and remains individually downloadable.
 4. The same group PDF list is used in Archive. Existing Archive PDFs appear alongside named slide PDFs and count toward the same 20-file limit. Existing files stay in their original private storage locations; no file copy or deletion is required.
+5. **Preview** opens a private PDF inside the page, with page navigation, fit width, zoom and original download. PDF minutes have the same preview option; DOCX/Markdown minutes remain downloadable. The renderer loads only when requested and does not send documents to an external viewer. The original download is available for selectable text and assistive reading tools.
+6. **Copy meeting link** or **Copy group link** shares a permanent location. The link expands the correct meeting in Upcoming or Archive and locates the group, including after a login or page refresh. Copied URLs contain no auth tokens or temporary storage links.
+7. **Questions & discussion** opens a group's thread. Any approved member can ask or reply, with a self-entered name and group. Questions can refer to one of that group's PDFs and a specific page. These signatures identify the stated author; shared-account login does not verify a personal identity. Discussions refresh when reopened, on window focus, or with **Refresh discussion**; this release does not send notifications.
+
+Assigned group members and administrators can mark questions **Open**, **Discuss at meeting**, **Answered**, or **Follow-up needed**. Discussion references retain the original filename if a PDF is later removed. Agenda slots with discussions cannot be removed or reassigned to another group or meeting, so the conversation retains its original context.
 
 Visitors can see meeting dates and agendas. Only approved signed-in members can see Zoom links, private resource metadata, or download files. Storage objects use private buckets and short-lived signed URLs.
 
@@ -79,6 +84,8 @@ Administrators can also add or rename research groups, deactivate groups that ar
 Versioned SQL migrations live in `supabase/migrations`. Local project-link data and administrator bootstrap values live under `supabase/.temp` and are ignored by Git.
 
 Apply `20260910090000_unified_meeting_pdfs.sql` before deploying the unified interface. It permits named PDF uploads after the meeting, counts existing Archive files toward the combined limit, and protects both file collections during schedule edits. PostgreSQL behavior tests use PGlite locally and do not write to the hosted database.
+
+Apply `20260910110000_meeting_discussions.sql` before deploying discussion UI. It adds questions/replies with member-only reads and validated write RPCs. Only assigned groups/admins can update status. No existing meetings, resources, or storage objects are rewritten by this migration.
 
 ## Repository Privacy
 

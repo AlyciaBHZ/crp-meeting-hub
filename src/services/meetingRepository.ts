@@ -176,6 +176,12 @@ export function createMeetingRepository(client: SupabaseClient) {
       ensureNoError(metadataResult.error)
     },
 
+    async getPdfBlob(bucket: 'slides' | 'minutes' | 'archive-lab-files', path: string) {
+      const result = await client.storage.from(bucket).download(path)
+      ensureNoError(result.error)
+      return requireData(result.data, 'The PDF could not be loaded.')
+    },
+
     async getDownloadUrl(bucket: 'slides' | 'minutes' | 'archive-lab-files', path: string) {
       const result = await client.storage.from(bucket).createSignedUrl(path, 60)
       ensureNoError(result.error)

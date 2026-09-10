@@ -1,15 +1,22 @@
 import { CalendarDays, CalendarPlus, ChevronDown, ChevronUp, Clock3, Pencil, Users, Video } from 'lucide-react'
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { AgendaSlot, ArchiveLabFile, Meeting, SlideFile } from '../data/meeting'
 import { canManageSlot, type MemberProfile } from '../services/meetingAccess'
 import type { MeetingView } from '../services/meetingLifecycle'
 import { Agenda } from './Agenda'
 import { Resources } from './Resources'
+import { ShareLink } from './ShareLink'
+import { meetingGroupAnchor, type MeetingTarget } from '../services/meetingLinks'
+import type { DiscussionRepository } from '../services/discussionRepository'
+import type { PdfResource } from '../data/discussion'
 
 interface MeetingCollectionProps {
   view: MeetingView
   meetings: Meeting[]
   profile: MemberProfile | null
+  target?: MeetingTarget | null
+  discussionRepository?: DiscussionRepository
+  onPreview?: (resource: PdfResource) => void
   onUploadSlides?: (meeting: Meeting, slot: AgendaSlot, displayName: string, file: File) => Promise<void>
   onDownloadSlides?: (meeting: Meeting, file: SlideFile) => Promise<void>
   onRemoveSlides?: (meeting: Meeting, file: SlideFile) => Promise<void>
@@ -38,6 +45,7 @@ interface MeetingCardProps extends Omit<MeetingCollectionProps, 'meetings'> {
 function MeetingCard({
   meeting, index, view, profile, onEditMeeting, onUploadSlides, onDownloadSlides,
   onRemoveSlides, onUploadMinutes, onDownloadMinutes, onDownloadArchiveFile,
+  target, discussionRepository, onPreview,
 }: MeetingCardProps) {
   const headingId = useId()
   const detailsId = useId()
@@ -46,6 +54,18 @@ function MeetingCard({
   const toggleRef = useRef<HTMLButtonElement>(null)
   const headerRef = useRef<HTMLElement>(null)
   const isAdmin = profile?.role === 'admin'
+
+  useEffect(() => {
+    if (target?.meetingId !== meeting.id) return
+    setExpanded(true)
+    const timer = window.setTimeout(() => {
+      const element = target.groupId ? document.getElementById(meetingGroupAnchor(meeting.id, target.groupId)) : headerRef.current
+      const destination = element ?? headerRef.current
+      destination?.scrollIntoView?.({ block: 'start' })
+      destination?.focus({ preventScroll: true })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [target, meeting.id])
 
   function collapseFromBottom() {
     setExpanded(false)
@@ -58,7 +78,7 @@ function MeetingCard({
 
   return (
     <article className={'meeting-entry' + (expanded ? '' : ' meeting-entry-collapsed')} aria-labelledby={headingId + ' ' + dateId}>
-      <header className="meeting-entry-header" ref={headerRef}>
+      <header className="meeting-entry-header" ref={headerRef} tabIndex={-1}>
         <div>
           <p className="meeting-sequence">{view === 'upcoming' && index === 0 ? 'Next meeting' : view === 'archive' ? 'Past meeting' : 'Upcoming meeting'}</p>
           <h2 id={headingId}>{meeting.title}</h2>
@@ -68,6 +88,7 @@ function MeetingCard({
           <div><dt><Clock3 aria-hidden="true" size={16} /> Time</dt><dd>{meetingTime(meeting)}</dd></div>
         </dl>
         <div className="meeting-entry-actions">
+          <ShareLink meetingId={meeting.id} />
           {isAdmin && view === 'upcoming' && onEditMeeting && <button type="button" className="secondary-button" onClick={() => onEditMeeting(meeting)}><Pencil aria-hidden="true" size={16} /> Edit meeting</button>}
           {view === 'upcoming' && profile && meeting.zoomUrl && (
             <a className="zoom-link" href={meeting.zoomUrl} target="_blank" rel="noreferrer">
@@ -88,12 +109,15 @@ function MeetingCard({
         isAdmin={isAdmin}
         onUpload={isAdmin && onUploadMinutes ? (file) => onUploadMinutes(meeting, file) : undefined}
         onDownload={profile && meeting.minutesObjectPath && onDownloadMinutes ? () => onDownloadMinutes(meeting) : undefined}
+        onPreview={profile && onPreview && meeting.minutesObjectPath && meeting.minutesFileName?.toLowerCase().endsWith('.pdf') ? () => onPreview({ bucket: 'minutes', path: meeting.minutesObjectPath!, name: meeting.minutesFileName! }) : undefined}
       />
 
       <div id={detailsId} className="meeting-details" hidden={!expanded}>
         <Agenda
           meeting={meeting}
           profile={profile}
+          discussionRepository={discussionRepository}
+          onPreview={onPreview}
           canUpload={(slot) => canManageSlot(profile, slot)}
           onUpload={onUploadSlides ? (slot, displayName, file) => onUploadSlides(meeting, slot, displayName, file) : undefined}
           onDownload={profile && onDownloadSlides ? (file) => onDownloadSlides(meeting, file) : undefined}

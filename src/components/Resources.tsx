@@ -10,9 +10,10 @@ interface ResourcesProps {
   isPast?: boolean
   onUpload?: (file: File) => Promise<void>
   onDownload?: () => Promise<void>
+  onPreview?: () => void
 }
 
-export function Resources({ meeting, isAdmin = false, compact = false, isPast = false, onUpload, onDownload }: ResourcesProps) {
+export function Resources({ meeting, isAdmin = false, compact = false, isPast = false, onUpload, onDownload, onPreview }: ResourcesProps) {
   const headingId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
@@ -56,8 +57,9 @@ export function Resources({ meeting, isAdmin = false, compact = false, isPast = 
         </div>
         <span className="admin-note"><LockKeyhole aria-hidden="true" size={15} /> Uploaded by admin</span>
         <div className="resource-actions">
+          {onPreview && <button className="secondary-button" type="button" onClick={onPreview}>Preview minutes</button>}
           {meeting?.minutesObjectPath && onDownload && (
-            <button className="secondary-button" type="button" onClick={() => void onDownload()}>
+            <button className="secondary-button" type="button" onClick={() => void onDownload().catch(() => setMessage('Download failed. Please try again.'))}>
               <Download aria-hidden="true" size={17} /> Download
             </button>
           )}

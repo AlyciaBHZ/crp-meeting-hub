@@ -476,3 +476,56 @@ footer p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+.share-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 100%; }
+.share-link small { flex-basis: 100%; color: #53675e; }
+.share-link input { width: 100%; min-width: 0; }
+.agenda-group .share-link { margin-top: 12px; }
+.agenda-row { scroll-margin-top: 24px; }
+.discussion { grid-column: 2 / -1; min-width: 0; width: 100%; border-top: 1px solid #dce4df; padding-top: 14px; }
+.slide-files-list li { display: flex; flex-wrap: wrap; }
+.slide-files-list li > svg, .slide-files-list li > button { flex-shrink: 0; }
+.slide-files-list li > span { flex: 1 1 150px; }
+.discussion-toggle { display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 8px 0; color: #264c40; font: inherit; font-weight: 600; cursor: pointer; }
+.discussion-form { display: grid; gap: 10px; padding: 18px; margin-top: 18px; background: #f3f6f3; border: 1px solid #dce4df; border-radius: 8px; }
+.discussion-form h4 { margin: 0; }
+.discussion-form label, .question-actions label { display: grid; gap: 6px; color: #46574e; font-size: .85rem; }
+.discussion input, .discussion select, .discussion textarea, .pdf-toolbar select { width: 100%; min-width: 0; border: 1px solid #b9c8be; border-radius: 5px; background: white; padding: 10px; color: #203b31; font: inherit; }
+.discussion textarea { resize: vertical; }
+.discussion-form > button { justify-self: start; }
+.discussion-author-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+.question { border: 1px solid #dce4df; border-radius: 8px; padding: 18px; margin-top: 16px; min-width: 0; }
+.question header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.question header span, .question time, .discussion-reply > span { color: #5b6c62; font-size: .8rem; }
+.question time { margin-left: auto; }
+.question-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
+.question-reference { display: grid; justify-items: start; gap: 6px; padding: 10px; background: #f3f6f3; overflow-wrap: anywhere; }
+.text-button { color: #285d49; cursor: pointer; background: none; border: 0; padding: 4px 0; font: inherit; text-decoration: underline; }
+.question-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between; margin-top: 14px; }
+.question-status { background: #edf2ec; padding: 6px 10px; border-radius: 6px; font-size: .85rem; }
+.question-status.answered { background: #dceee2; }
+.discussion-reply { border-left: 3px solid #b9cbbd; margin-top: 16px; padding: 8px 14px; background: #f8faf7; }
+.pdf-dialog { width: min(1000px, 96vw); max-width: 96vw; height: 92dvh; max-height: 96dvh; margin: auto; padding: 20px; border: 1px solid #acbfb1; border-radius: 12px; color: #203b31; }
+.pdf-dialog::backdrop { background: #10231dd1; }
+.pdf-dialog[open] { display: flex; flex-direction: column; gap: 14px; }
+.pdf-dialog > header { display: flex; gap: 16px; justify-content: space-between; align-items: center; }
+.pdf-dialog h2 { font-size: 1.1rem; overflow-wrap: anywhere; min-width: 0; margin: 0; }
+.pdf-dialog > header button { flex-shrink: 0; }
+.pdf-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.pdf-toolbar label { display: flex; gap: 6px; align-items: center; }
+.pdf-toolbar select { width: auto; }
+.pdf-canvas-container { flex: 1; min-height: 0; width: 100%; overflow: auto; background: #e5e9e5; padding: 16px; }
+.pdf-canvas-container canvas { display: block; margin: 0 auto; background: white; }
+@media (max-width: 1000px) { .discussion { grid-column: 2 / -1; } }
+@media (max-width: 620px) {
+  .discussion { grid-column: 1 / -1; }
+  .discussion-author-fields { grid-template-columns: minmax(0, 1fr); }
+  .discussion-form > *, .discussion-form > button { grid-column: 1; }
+  .question { padding: 14px; }
+  .question time { margin-left: 0; width: 100%; }
+  .pdf-dialog { padding: 12px; }
+  .pdf-toolbar { gap: 8px; font-size: .8rem; }
+  .pdf-toolbar button { padding: 8px; }
+  .slide-files-list li > span { flex-basis: calc(100% - 40px); }
+  .slide-files-control { grid-column: 1 / -1; }
+}
