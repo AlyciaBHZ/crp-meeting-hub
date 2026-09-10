@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Meeting } from '../data/meeting'
 import { MeetingCollection } from './MeetingCollection'
@@ -31,7 +32,6 @@ const callbacks = {
   onDownloadSlides: vi.fn(() => Promise.resolve()),
   onUploadMinutes: vi.fn(() => Promise.resolve()),
   onDownloadMinutes: vi.fn(() => Promise.resolve()),
-  onUploadArchiveFiles: vi.fn(() => Promise.resolve()),
   onDownloadArchiveFile: vi.fn(() => Promise.resolve()),
 }
 
@@ -40,7 +40,7 @@ describe('MeetingCollection', () => {
     render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
 
     expect(screen.getByRole('heading', { name: 'Past meetings' })).toBeInTheDocument()
-    expect(screen.getAllByText('14 Jun 2026')).toHaveLength(2)
+    expect(screen.getAllByText('14 Jun 2026')).toHaveLength(1)
     expect(screen.queryByRole('link', { name: 'Open Zoom meeting' })).not.toBeInTheDocument()
     expect(screen.getByText('Project update')).toBeInTheDocument()
     expect(screen.getByText(/slides\.pdf/)).toBeInTheDocument()
@@ -65,15 +65,19 @@ describe('MeetingCollection', () => {
     expect(screen.getByText('No online meeting is scheduled yet.')).toBeInTheDocument()
   })
 
-  it('shows Lab PDF archives only to signed-in members', () => {
+  it('unifies old archive PDFs and slides in one group card, visible only to members', () => {
     const { rerender } = render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={null} />)
     expect(screen.queryByText('Lab PDF archive')).not.toBeInTheDocument()
     expect(screen.queryByText('results.pdf')).not.toBeInTheDocument()
+    expect(screen.queryByText('Project update')).not.toBeInTheDocument()
 
     rerender(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
-    expect(screen.getByText('Lab PDF archive')).toBeInTheDocument()
-    expect(screen.getByText('results.pdf')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Group 1' })).toBeInTheDocument()
+    expect(screen.queryByText('Lab PDF archive')).not.toBeInTheDocument()
+    const group = within(screen.getByRole('region', { name: 'PDFs for Group 1' }))
+    expect(group.getByText('results.pdf')).toBeInTheDocument()
+    expect(group.getByText('Project update')).toBeInTheDocument()
+    expect(group.getByText('2 / 20 PDFs')).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'Group 1' })).toHaveLength(1)
   })
 
   it('lets an administrator upload for every participating Lab', () => {
@@ -83,16 +87,17 @@ describe('MeetingCollection', () => {
     }
     render(<MeetingCollection {...callbacks} view="archive" meetings={[meeting]} profile={{ id: 'admin-1', role: 'admin' }} />)
 
-    expect(screen.getByRole('option', { name: 'Group 1' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Group 2' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'PDFs for Group 1' })).getByRole('button', { name: 'Upload PDF' })).toBeEnabled()
+    expect(within(screen.getByRole('region', { name: 'PDFs for Group 2' })).getByRole('button', { name: 'Upload PDF' })).toBeEnabled()
   })
 
-  it('shows named PDF slide controls only for an authorized upcoming Lab', () => {
+  it('keeps the same upload control before and after a meeting for an assigned group', () => {
     const upcoming = {
       ...pastMeeting,
       id: 'meeting-future',
       date: '14 Oct 2026',
       dateISO: '2026-10-14',
+      archiveFiles: [],
       slots: pastMeeting.slots.map((slot) => ({ ...slot, slideStatus: 'awaiting' as const, slideFiles: [] })),
     }
     const { rerender } = render(
@@ -104,6 +109,35 @@ describe('MeetingCollection', () => {
     expect(screen.getByText('0 / 20 PDFs')).toBeInTheDocument()
 
     rerender(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
-    expect(screen.queryByLabelText('Presenter / document name')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Presenter / document name')).toBeInTheDocument()
+    rerender(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'unassigned', role: 'presenter' }} />)
+    expect(screen.queryByRole('button', { name: 'Upload PDF' })).not.toBeInTheDocument()
+  })
+
+  it('routes archived PDFs and new PDF uploads to the correct meeting', async () => {
+    render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Download results.pdf' }))
+    expect(callbacks.onDownloadArchiveFile).toHaveBeenCalledWith(pastMeeting, pastMeeting.archiveFiles![0])
+    await userEvent.type(screen.getByLabelText('Presenter / document name'), 'Follow-up')
+    const pdf = new File(['pdf'], 'follow-up.pdf', { type: 'application/pdf' })
+    await userEvent.upload(screen.getByLabelText('PDF file for Group 1'), pdf)
+    await userEvent.click(screen.getByRole('button', { name: 'Upload PDF' }))
+    expect(callbacks.onUploadSlides).toHaveBeenCalledWith(pastMeeting, pastMeeting.slots[0], 'Follow-up', pdf)
+    expect(screen.queryByRole('button', { name: /Upload minutes|Replace minutes/ })).not.toBeInTheDocument()
+  })
+
+  it('exposes creation and editing directly to administrators only', async () => {
+    const onCreateMeeting = vi.fn()
+    const onEditMeeting = vi.fn()
+    const { rerender } = render(<MeetingCollection {...callbacks} view="upcoming" meetings={[pastMeeting]} profile={{ id: 'admin', role: 'admin' }} onCreateMeeting={onCreateMeeting} onEditMeeting={onEditMeeting} />)
+    await userEvent.click(screen.getByRole('button', { name: 'New meeting' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit meeting' }))
+    expect(onCreateMeeting).toHaveBeenCalledOnce()
+    expect(onEditMeeting).toHaveBeenCalledWith(pastMeeting)
+    rerender(<MeetingCollection {...callbacks} view="upcoming" meetings={[pastMeeting]} profile={{ id: 'member', role: 'presenter' }} onCreateMeeting={onCreateMeeting} onEditMeeting={onEditMeeting} />)
+    expect(screen.queryByRole('button', { name: 'New meeting' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit meeting' })).not.toBeInTheDocument()
+    rerender(<MeetingCollection {...callbacks} view="upcoming" meetings={[]} profile={{ id: 'admin', role: 'admin' }} onCreateMeeting={onCreateMeeting} />)
+    expect(screen.getByRole('button', { name: 'New meeting' })).toBeEnabled()
   })
 })

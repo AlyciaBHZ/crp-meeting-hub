@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { Archive, CalendarDays, Cloud, CloudOff, FolderKanban } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminPanel, type ProfileRecord } from './components/AdminPanel'
 import { AuthPanel } from './components/AuthPanel'
 import { MeetingCollection } from './components/MeetingCollection'
@@ -30,6 +30,8 @@ export default function App() {
   const [groups, setGroups] = useState<ResearchGroup[]>(isSupabaseConfigured ? [] : localGroups)
   const [profiles, setProfiles] = useState<ProfileRecord[]>([])
   const [cloudError, setCloudError] = useState<string | null>(null)
+  const [adminRequest, setAdminRequest] = useState<{ meetingId?: string; mode: 'upcoming' | 'past'; groups?: boolean; key: number } | null>(null)
+  const adminRef = useRef<HTMLDivElement>(null)
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(
     () => new URLSearchParams(window.location.search).get('password_setup') === '1',
   )
@@ -119,6 +121,17 @@ export default function App() {
 
   const isAdmin = profile?.role === 'admin'
 
+  function openAdmin(options: { meetingId?: string; mode: 'upcoming' | 'past'; groups?: boolean }) {
+    setAdminRequest({ ...options, key: Date.now() })
+  }
+
+  useEffect(() => {
+    if (!adminRequest || !isAdmin) return
+    const target = adminRequest.groups ? document.getElementById('groups-heading') : adminRef.current
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    target?.focus({ preventScroll: true })
+  }, [adminRequest, isAdmin])
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -161,6 +174,9 @@ export default function App() {
           view={view}
           meetings={meetings[view]}
           profile={profile}
+          onCreateMeeting={() => openAdmin({ mode: view === 'archive' ? 'past' : 'upcoming' })}
+          onEditMeeting={(meeting) => openAdmin({ meetingId: meeting.id, mode: 'upcoming' })}
+          onManageGroups={() => openAdmin({ mode: 'upcoming', groups: true })}
           onUploadSlides={isSupabaseConfigured ? uploadSlides : undefined}
           onDownloadSlides={user && profile ? (_meeting, file) => download('slides', file.objectPath) : undefined}
           onRemoveSlides={user && profile && repository ? async (_meeting, file: SlideFile) => {
@@ -172,18 +188,16 @@ export default function App() {
             await loadMeetings()
           } : undefined}
           onDownloadMinutes={user && profile ? (meeting) => download('minutes', meeting.minutesObjectPath) : undefined}
-          onUploadArchiveFiles={user && profile && repository ? async (meeting, groupId, files) => {
-            try {
-              for (const file of files) await repository.uploadArchiveLabFile(meeting.id, groupId, file)
-            } finally {
-              await loadMeetings()
-            }
-          } : undefined}
           onDownloadArchiveFile={user && profile ? (_meeting, file: ArchiveLabFile) => download('archive-lab-files', file.objectPath) : undefined}
         />
 
-        {isAdmin && repository && (
+        {isAdmin && repository && adminRequest && (
+          <div ref={adminRef} tabIndex={-1} className="admin-anchor">
           <AdminPanel
+            key={adminRequest.key}
+            initialMeetingId={adminRequest.meetingId}
+            initialMode={adminRequest.mode}
+            onClose={() => setAdminRequest(null)}
             profiles={profiles}
             groups={groups}
             meetings={meetings.upcoming}
@@ -214,6 +228,7 @@ export default function App() {
               await Promise.all([loadGroups(), loadMeetings()])
             }}
           />
+          </div>
         )}
       </main>
 

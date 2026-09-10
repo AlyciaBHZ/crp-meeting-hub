@@ -11,7 +11,7 @@ describe('CRP Meeting Hub', () => {
     expect(screen.getAllByText(/5 min Q&A/).length).toBeGreaterThan(0)
     expect(screen.getByText("Prof Zhang Yang's group")).toBeInTheDocument()
     expect(screen.getByText("Prof Li Qi Jing's group")).toBeInTheDocument()
-    expect(screen.getAllByRole('region', { name: /slides for/i })).toHaveLength(6)
+    expect(screen.getAllByRole('region', { name: /PDFs for/i })).toHaveLength(6)
     expect(screen.queryByRole('button', { name: 'Upload PDF' })).not.toBeInTheDocument()
     expect(container.querySelectorAll('input[type="file"]:not([hidden])')).toHaveLength(0)
   })

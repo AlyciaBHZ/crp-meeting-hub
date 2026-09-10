@@ -22,6 +22,8 @@ npm run build
 - Reusable research groups with approved group members
 - A different selection and order of presenting groups for every meeting
 - Exact start and end time controls for every agenda slot
+- Direct administrator New meeting, Edit meeting, and Groups and members actions
+- A Singapore meeting start time that shifts the agenda while preserving breaks and group ownership
 - Shared username or personal email and password sign-in
 - Email-link password setup and reset flow
 - Private named PDF slide collections, up to 20 files per Lab per meeting and 50 MB per file
@@ -29,9 +31,9 @@ npm run build
 - 60-second signed download links
 - Automatic archive placement based on the Singapore calendar date
 - Administrator registration of past meetings without obsolete Zoom links
-- Private Archive PDF collections grouped by Lab and meeting
-- Separate Archive Lab PDF collections with a 20-file limit per Lab per meeting
-- Slide PDF upload before the meeting and administrator-managed minutes uploads
+- A single PDF list inside each group's agenda card, including previously uploaded Archive files
+- One combined 20-PDF limit per group per meeting, enforced across both storage collections
+- PDF upload before and after the meeting, with administrator-managed minutes in the same meeting
 - Administrator controls for meetings, groups, and Lab assignments
 - Responsive desktop and mobile layouts
 
@@ -55,23 +57,25 @@ Copy `.env.example` to `.env.local` and use the Supabase project URL plus its pu
 The small CRP team uses centrally managed shared member and administrator usernames. These aliases resolve to private Supabase Auth identities in the application; their passwords are configured directly in Supabase and are never committed to the repository. The administrator workspace intentionally does not create additional user accounts.
 
 1. Members sign in with the shared member credentials.
-2. Before a meeting, the shared member opens the scheduled Lab, enters a presenter or document name, chooses a PDF, and uploads it.
+2. In Upcoming or Archive, the shared member opens the scheduled group's agenda card, enters a presenter or document name, chooses a PDF, and uploads it.
 3. Each scheduled Lab can hold up to 20 slide PDFs for that meeting. Every PDF is private, limited to 50 MB, and remains individually downloadable.
-4. In Archive, signed-in members can review and download the meeting's slide PDFs. The separate Lab PDF archive accepts up to 20 additional PDFs per participating Lab.
+4. The same group PDF list is used in Archive. Existing Archive PDFs appear alongside named slide PDFs and count toward the same 20-file limit. Existing files stay in their original private storage locations; no file copy or deletion is required.
 
 Visitors can see meeting dates and agendas. Only approved signed-in members can see Zoom links, private resource metadata, or download files. Storage objects use private buckets and short-lived signed URLs.
 
 ## Administrator Workflow
 
-Administrators create a meeting by setting its title, date, presentation and Q&A durations, entering its Zoom URL, selecting the groups presenting in that meeting, ordering them, and setting exact start and end times. Existing upcoming meetings can be edited in the same workspace, including every one of those fields. A meeting moves to **Archive** automatically after its date; there is no manual archive action or upload-completeness requirement.
+Administrators select **New meeting** in Upcoming, then set the title, date, Singapore start time, presentation and Q&A durations, Zoom URL, presenting groups, order, and individual slot times. **Edit meeting** opens that meeting's existing values directly. Changing the overall start shifts all slots and preserves breaks, durations, and group/file ownership. **Groups and members** opens the group assignment controls. A meeting moves to **Archive** automatically after its date; there is no manual archive action or upload-completeness requirement.
 
-For meetings that happened before this workspace was introduced, administrators use **Past meeting** to register the original date, participating Labs, order, and times. Historical meetings do not require or retain an obsolete Zoom link. In Archive, administrators may upload PDFs for any Lab that participated in that meeting; presenters can upload only for their assigned Labs. The database transactionally enforces both 20-PDF limits. Administrators or the original uploader can remove a slide PDF; a Lab with uploaded Slides cannot be removed from an agenda until those PDFs are removed.
+For meetings that happened before this workspace was introduced, administrators use **Add past meeting** in Archive to register the original date, participating groups, order, and times. Historical meetings do not require or retain an obsolete Zoom link. Administrators may upload PDFs for any participating group; presenters can upload only for their assigned groups. The database transactionally enforces a single combined 20-PDF limit across old and new uploads. Existing collections above that limit are preserved, but cannot accept new PDFs. Administrators or the original uploader can remove a named slide PDF. Groups with attached PDFs are protected against removal or reassignment to preserve their files. Only administrators upload or replace minutes; approved members can download them.
 
 Administrators can also add or rename research groups, deactivate groups that are no longer in use, and maintain Lab assignments for the existing shared account. Account credentials are managed centrally rather than through the website. `src/data/meeting.ts` remains the local-preview fallback when Supabase environment variables are absent.
 
 ## Database Changes
 
 Versioned SQL migrations live in `supabase/migrations`. Local project-link data and administrator bootstrap values live under `supabase/.temp` and are ignored by Git.
+
+Apply `20260910090000_unified_meeting_pdfs.sql` before deploying the unified interface. It permits named PDF uploads after the meeting, counts existing Archive files toward the combined limit, and protects both file collections during schedule edits. PostgreSQL behavior tests use PGlite locally and do not write to the hosted database.
 
 ## Repository Privacy
 

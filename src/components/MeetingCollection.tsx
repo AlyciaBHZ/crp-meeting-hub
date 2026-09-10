@@ -1,10 +1,9 @@
-import { CalendarDays, Clock3, Video } from 'lucide-react'
+import { CalendarDays, CalendarPlus, Clock3, Pencil, Users, Video } from 'lucide-react'
 import { useId } from 'react'
 import type { AgendaSlot, ArchiveLabFile, Meeting, SlideFile } from '../data/meeting'
 import { canManageSlot, type MemberProfile } from '../services/meetingAccess'
 import type { MeetingView } from '../services/meetingLifecycle'
 import { Agenda } from './Agenda'
-import { ArchiveLabFiles } from './ArchiveLabFiles'
 import { Resources } from './Resources'
 
 interface MeetingCollectionProps {
@@ -16,13 +15,15 @@ interface MeetingCollectionProps {
   onRemoveSlides?: (meeting: Meeting, file: SlideFile) => Promise<void>
   onUploadMinutes?: (meeting: Meeting, file: File) => Promise<void>
   onDownloadMinutes?: (meeting: Meeting) => Promise<void>
-  onUploadArchiveFiles?: (meeting: Meeting, groupId: string, files: File[]) => Promise<void>
   onDownloadArchiveFile?: (meeting: Meeting, file: ArchiveLabFile) => Promise<void>
+  onCreateMeeting?: () => void
+  onEditMeeting?: (meeting: Meeting) => void
+  onManageGroups?: () => void
 }
 
 function meetingTime(meeting: Meeting) {
   if (!meeting.slots.length) return 'Schedule pending'
-  return `${meeting.slots[0].startsAt} - ${meeting.slots[meeting.slots.length - 1].endsAt}`
+  return `${meeting.slots.map((slot) => slot.startsAt).sort()[0]} - ${meeting.slots.map((slot) => slot.endsAt).sort().at(-1)}`
 }
 
 export function MeetingCollection({
@@ -34,8 +35,10 @@ export function MeetingCollection({
   onRemoveSlides,
   onUploadMinutes,
   onDownloadMinutes,
-  onUploadArchiveFiles,
   onDownloadArchiveFile,
+  onCreateMeeting,
+  onEditMeeting,
+  onManageGroups,
 }: MeetingCollectionProps) {
   const headingId = useId()
   const isAdmin = profile?.role === 'admin'
@@ -47,8 +50,14 @@ export function MeetingCollection({
   return (
     <section className="meeting-collection" aria-labelledby={headingId}>
       <header className="collection-heading">
+        <div>
         <p className="eyebrow">CRP online meetings</p>
         <h1 id={headingId}>{title}</h1>
+        </div>
+        {isAdmin && <div className="collection-actions">
+          {onManageGroups && <button type="button" className="secondary-button" onClick={onManageGroups}><Users aria-hidden="true" size={17} /> Groups and members</button>}
+          {onCreateMeeting && <button type="button" className="upload-button" onClick={onCreateMeeting}><CalendarPlus aria-hidden="true" size={17} /> {view === 'upcoming' ? 'New meeting' : 'Add past meeting'}</button>}
+        </div>}
       </header>
 
       {!meetings.length && <p className="empty-state">{emptyMessage}</p>}
@@ -59,27 +68,31 @@ export function MeetingCollection({
           <article className="meeting-entry" key={meeting.id} aria-labelledby={meetingHeadingId}>
             <header className="meeting-entry-header">
               <div>
-                <p className="meeting-sequence">{view === 'upcoming' && index === 0 ? 'Next meeting' : meeting.title}</p>
-                <h2 id={meetingHeadingId}>{meeting.date ?? 'Date pending'}</h2>
+                <p className="meeting-sequence">{view === 'upcoming' && index === 0 ? 'Next meeting' : view === 'archive' ? 'Past meeting' : 'Upcoming meeting'}</p>
+                <h2 id={meetingHeadingId}>{meeting.title}</h2>
               </div>
               <dl className="online-meeting-facts">
                 <div><dt><CalendarDays aria-hidden="true" size={16} /> Date</dt><dd>{meeting.date ?? 'Pending'}</dd></div>
                 <div><dt><Clock3 aria-hidden="true" size={16} /> Time</dt><dd>{meetingTime(meeting)}</dd></div>
               </dl>
+              <div className="meeting-entry-actions">
+              {isAdmin && view === 'upcoming' && onEditMeeting && <button type="button" className="secondary-button" onClick={() => onEditMeeting(meeting)}><Pencil aria-hidden="true" size={16} /> Edit meeting</button>}
               {view === 'upcoming' && profile && meeting.zoomUrl && (
                 <a className="zoom-link" href={meeting.zoomUrl} target="_blank" rel="noreferrer">
                   <Video aria-hidden="true" size={17} /> Open Zoom meeting
                 </a>
               )}
+              </div>
             </header>
 
             <Agenda
               meeting={meeting}
               profile={profile}
               canUpload={(slot) => canManageSlot(profile, slot)}
-              onUpload={view === 'upcoming' && onUploadSlides ? (slot, displayName, file) => onUploadSlides(meeting, slot, displayName, file) : undefined}
+              onUpload={onUploadSlides ? (slot, displayName, file) => onUploadSlides(meeting, slot, displayName, file) : undefined}
               onDownload={profile && onDownloadSlides ? (file) => onDownloadSlides(meeting, file) : undefined}
               onRemove={profile && onRemoveSlides ? (file) => onRemoveSlides(meeting, file) : undefined}
+              onDownloadArchiveFile={profile && onDownloadArchiveFile ? (file) => onDownloadArchiveFile(meeting, file) : undefined}
             />
             <Resources
               meeting={meeting}
@@ -87,14 +100,6 @@ export function MeetingCollection({
               onUpload={isAdmin && onUploadMinutes ? (file) => onUploadMinutes(meeting, file) : undefined}
               onDownload={profile && meeting.minutesObjectPath && onDownloadMinutes ? () => onDownloadMinutes(meeting) : undefined}
             />
-            {view === 'archive' && profile && (
-              <ArchiveLabFiles
-                meeting={meeting}
-                profile={profile}
-                onUpload={onUploadArchiveFiles ? (groupId, files) => onUploadArchiveFiles(meeting, groupId, files) : undefined}
-                onDownload={onDownloadArchiveFile ? (file) => onDownloadArchiveFile(meeting, file) : undefined}
-              />
-            )}
           </article>
         )
       })}

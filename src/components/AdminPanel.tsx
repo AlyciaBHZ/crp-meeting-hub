@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, CalendarPlus, Save, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import type { AgendaDraftSlot, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup } from '../data/meeting'
-import { buildAgendaDraft, getSingaporeTodayISO, validateHistoricalMeetingDraft, validateMeetingDraft } from '../services/meetingLifecycle'
+import { buildAgendaDraft, getSingaporeTodayISO, shiftAgendaStart, validateHistoricalMeetingDraft, validateMeetingDraft } from '../services/meetingLifecycle'
 
 export interface ProfileRecord {
   id: string
@@ -11,6 +11,9 @@ export interface ProfileRecord {
 }
 
 interface AdminPanelProps {
+  initialMeetingId?: string
+  initialMode?: 'upcoming' | 'past'
+  onClose?: () => void
   profiles: ProfileRecord[]
   groups: ResearchGroup[]
   meetings: Meeting[]
@@ -22,15 +25,24 @@ interface AdminPanelProps {
   onSetGroupMember: (groupId: string, profileId: string, enabled: boolean) => Promise<void>
 }
 
-function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, onRegisterHistoricalMeeting }: Pick<AdminPanelProps, 'groups' | 'meetings' | 'onCreateMeeting' | 'onUpdateMeeting' | 'onRegisterHistoricalMeeting'>) {
-  const [mode, setMode] = useState<'upcoming' | 'past'>('upcoming')
-  const [editingMeetingId, setEditingMeetingId] = useState('')
-  const [title, setTitle] = useState('CRP Grant Meeting - Decoding Adaptive Immunity')
-  const [date, setDate] = useState('')
-  const [zoomUrl, setZoomUrl] = useState('')
-  const [presentationMinutes, setPresentationMinutes] = useState(30)
-  const [qaMinutes, setQaMinutes] = useState(10)
-  const [slots, setSlots] = useState<AgendaDraftSlot[]>([])
+function draftSlots(meeting?: Meeting): AgendaDraftSlot[] {
+  return meeting?.slots.flatMap((slot, index) => slot.groupId ? [{
+    id: slot.id, groupId: slot.groupId, groupName: slot.groupName,
+    startsAt: slot.startsAt, endsAt: slot.endsAt, sortOrder: index + 1,
+  }] : []) ?? []
+}
+
+function MeetingBuilder({ groups, meetings, initialMeetingId, initialMode = 'upcoming', onCreateMeeting, onUpdateMeeting, onRegisterHistoricalMeeting }: Pick<AdminPanelProps, 'groups' | 'meetings' | 'initialMeetingId' | 'initialMode' | 'onCreateMeeting' | 'onUpdateMeeting' | 'onRegisterHistoricalMeeting'>) {
+  const initialMeeting = meetings.find((meeting) => meeting.id === initialMeetingId)
+  const [mode, setMode] = useState<'upcoming' | 'past'>(initialMode)
+  const [editingMeetingId, setEditingMeetingId] = useState(initialMeeting?.id ?? '')
+  const [title, setTitle] = useState(initialMeeting?.title ?? 'CRP Grant Meeting - Decoding Adaptive Immunity')
+  const [date, setDate] = useState(initialMeeting?.dateISO ?? '')
+  const [zoomUrl, setZoomUrl] = useState(initialMeeting?.zoomUrl ?? '')
+  const [presentationMinutes, setPresentationMinutes] = useState(initialMeeting?.presentationMinutes ?? 30)
+  const [qaMinutes, setQaMinutes] = useState(initialMeeting?.qaMinutes ?? 10)
+  const [slots, setSlots] = useState<AgendaDraftSlot[]>(draftSlots(initialMeeting))
+  const [startsAt, setStartsAt] = useState(initialMeeting?.slots[0]?.startsAt ?? '09:00')
   const [message, setMessage] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -43,6 +55,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
     setPresentationMinutes(30)
     setQaMinutes(10)
     setSlots([])
+    setStartsAt('09:00')
     setMessage(null)
   }
 
@@ -56,6 +69,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
       setPresentationMinutes(30)
       setQaMinutes(10)
       setSlots([])
+      setStartsAt('09:00')
       return
     }
     const meeting = meetings.find((candidate) => candidate.id === meetingId)
@@ -65,20 +79,13 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
     setZoomUrl(meeting.zoomUrl ?? '')
     setPresentationMinutes(meeting.presentationMinutes)
     setQaMinutes(meeting.qaMinutes)
-    setSlots(meeting.slots.flatMap((slot, index) => slot.groupId ? [{
-      id: slot.id,
-      groupId: slot.groupId,
-      groupName: slot.groupName,
-      startsAt: slot.startsAt,
-      endsAt: slot.endsAt,
-      sortOrder: index + 1,
-    }] : []))
+    setSlots(draftSlots(meeting))
+    setStartsAt(meeting.slots[0]?.startsAt ?? '09:00')
   }
 
   function toggleGroup(group: ResearchGroup, selected: boolean) {
     if (selected) {
-      const startsAt = slots.at(-1)?.endsAt ?? '09:00'
-      const nextSlot = buildAgendaDraft([group], startsAt, mode === 'past' ? 20 : presentationMinutes + qaMinutes)[0]
+      const nextSlot = buildAgendaDraft([group], slots.at(-1)?.endsAt ?? startsAt, mode === 'past' ? 20 : presentationMinutes + qaMinutes)[0]
       setSlots([...slots, { ...nextSlot, sortOrder: slots.length + 1 }])
       return
     }
@@ -86,7 +93,19 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
   }
 
   function updateSlot(index: number, updates: Partial<AgendaDraftSlot>) {
+    if (index === 0 && updates.startsAt) setStartsAt(updates.startsAt)
     setSlots(slots.map((slot, slotIndex) => slotIndex === index ? { ...slot, ...updates } : slot))
+  }
+
+  function changeStart(nextStart: string) {
+    if (!nextStart) return
+    try {
+      setSlots(shiftAgendaStart(slots, nextStart))
+      setStartsAt(nextStart)
+      setMessage(null)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to shift the agenda.')
+    }
   }
 
   function moveGroup(index: number, direction: -1 | 1) {
@@ -133,6 +152,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
       setQaMinutes(10)
       setSlots([])
       setMessage(mode === 'past' ? 'Past meeting registered.' : editingMeetingId ? 'Meeting updated.' : 'Meeting created.')
+      setStartsAt('09:00')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to create the meeting.')
     } finally {
@@ -161,6 +181,8 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
           </>}
           <label htmlFor="new-meeting-date">{mode === 'past' ? 'Past meeting date' : 'Meeting date'}</label>
           <input id="new-meeting-date" type="date" required max={mode === 'past' ? getSingaporeTodayISO() : undefined} value={date} onChange={(event) => setDate(event.target.value)} />
+          <label htmlFor="meeting-start-time">Meeting start (Singapore)</label>
+          <input id="meeting-start-time" type="time" required value={slots[0]?.startsAt ?? startsAt} onChange={(event) => changeStart(event.target.value)} />
           {mode === 'upcoming' && <>
             <label htmlFor="new-meeting-zoom">Zoom link</label>
             <input id="new-meeting-zoom" type="url" required placeholder="https://zoom.us/j/..." value={zoomUrl} onChange={(event) => setZoomUrl(event.target.value)} />
@@ -180,7 +202,7 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
 
         <fieldset className="group-picker">
           <legend>Presenting groups</legend>
-          {groups.filter((group) => group.active).map((group) => (
+          {groups.filter((group) => group.active || slots.some((slot) => slot.groupId === group.id)).map((group) => (
             <label key={group.id}>
               <input
                 type="checkbox"
@@ -199,12 +221,12 @@ function MeetingBuilder({ groups, meetings, onCreateMeeting, onUpdateMeeting, on
               <div className="agenda-draft-row" key={slot.groupId}>
                 <span className="agenda-draft-order">{String(index + 1).padStart(2, '0')}</span>
                 <strong>{slot.groupName}</strong>
-                <label>Start <input type="time" value={slot.startsAt} onChange={(event) => updateSlot(index, { startsAt: event.target.value })} /></label>
-                <label>End <input type="time" value={slot.endsAt} onChange={(event) => updateSlot(index, { endsAt: event.target.value })} /></label>
+                <label>Start <input type="time" required aria-label={`Start time for ${slot.groupName}`} value={slot.startsAt} onChange={(event) => updateSlot(index, { startsAt: event.target.value })} /></label>
+                <label>End <input type="time" required aria-label={`End time for ${slot.groupName}`} value={slot.endsAt} onChange={(event) => updateSlot(index, { endsAt: event.target.value })} /></label>
                 <div className="row-tools">
                   <button type="button" className="icon-button" aria-label={`Move ${slot.groupName} up`} disabled={index === 0} onClick={() => moveGroup(index, -1)}><ArrowUp aria-hidden="true" size={16} /></button>
                   <button type="button" className="icon-button" aria-label={`Move ${slot.groupName} down`} disabled={index === slots.length - 1} onClick={() => moveGroup(index, 1)}><ArrowDown aria-hidden="true" size={16} /></button>
-                  <button type="button" className="icon-button danger" aria-label={`Remove ${slot.groupName}`} onClick={() => toggleGroup(groups.find((group) => group.id === slot.groupId)!, false)}><X aria-hidden="true" size={16} /></button>
+                  <button type="button" className="icon-button danger" aria-label={`Remove ${slot.groupName}`} onClick={() => setSlots(slots.filter((candidate) => candidate.groupId !== slot.groupId).map((candidate, position) => ({ ...candidate, sortOrder: position + 1 })))}><X aria-hidden="true" size={16} /></button>
                 </div>
               </div>
             ))}
@@ -226,6 +248,20 @@ function GroupManager({ groups, profiles, onCreateGroup, onUpdateGroup, onSetGro
   const [newGroupName, setNewGroupName] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+
+  async function saveChange(action: () => Promise<void>, success: string) {
+    setPending(true)
+    setMessage(null)
+    try {
+      await action()
+      setMessage(success)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to save changes.')
+    } finally {
+      setPending(false)
+    }
+  }
 
   useEffect(() => {
     setNames(Object.fromEntries(groups.map((group) => [group.id, group.name])))
@@ -246,23 +282,24 @@ function GroupManager({ groups, profiles, onCreateGroup, onUpdateGroup, onSetGro
   return (
     <section className="admin-workspace-section" aria-labelledby="groups-heading">
       <div className="admin-subheading">
-        <div><p className="eyebrow">Long-term units</p><h3 id="groups-heading">Groups and members</h3></div>
+        <div><p className="eyebrow">Research groups</p><h3 id="groups-heading" tabIndex={-1}>Groups and members</h3></div>
         <Users aria-hidden="true" size={20} />
       </div>
       <form className="add-group-form" onSubmit={createGroup}>
         <label htmlFor="new-group-name">New group name</label>
         <input id="new-group-name" required value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} />
         <button className="secondary-button" type="submit">Add group</button>
-        {message && <p className="member-message" role="status">{message}</p>}
       </form>
+
+      {message && <p className="group-save-message" role="status">{message}</p>}
 
       <div className="group-admin-list">
         {groups.map((group) => (
           <section className="group-admin-row" key={group.id} aria-label={group.name}>
             <div className="group-name-controls">
               <input aria-label={`${group.name} name`} value={names[group.id] ?? group.name} onChange={(event) => setNames({ ...names, [group.id]: event.target.value })} />
-              <button type="button" className="icon-button" aria-label={`Save ${group.name} name`} onClick={() => void onUpdateGroup(group.id, { name: names[group.id]?.trim() })}><Save aria-hidden="true" size={16} /></button>
-              <label className="status-toggle"><input type="checkbox" checked={group.active} onChange={(event) => void onUpdateGroup(group.id, { active: event.target.checked })} /> Active</label>
+              <button type="button" className="icon-button" disabled={pending || !names[group.id]?.trim()} aria-label={`Save ${group.name} name`} onClick={() => void saveChange(() => onUpdateGroup(group.id, { name: names[group.id]?.trim() }), 'Group name saved.')}><Save aria-hidden="true" size={16} /></button>
+              <label className="status-toggle"><input type="checkbox" disabled={pending} checked={group.active} onChange={(event) => { const active = event.target.checked; void saveChange(() => onUpdateGroup(group.id, { active }), 'Group status saved.') }} /> Active</label>
             </div>
             <div className="group-member-options">
               {profiles.map((profile) => {
@@ -273,7 +310,8 @@ function GroupManager({ groups, profiles, onCreateGroup, onUpdateGroup, onSetGro
                       type="checkbox"
                       aria-label={`${label} in ${group.name}`}
                       checked={group.memberIds.includes(profile.id)}
-                      onChange={(event) => void onSetGroupMember(group.id, profile.id, event.target.checked)}
+                      disabled={pending}
+                      onChange={(event) => { const enabled = event.target.checked; void saveChange(() => onSetGroupMember(group.id, profile.id, enabled), 'Group members saved.') }}
                     />
                     <span>{label}</span>
                   </label>
@@ -292,10 +330,13 @@ export function AdminPanel(props: AdminPanelProps) {
     <section className="admin-section" aria-labelledby="admin-heading">
       <div className="section-heading">
         <div><p className="eyebrow">Administrator</p><h2 id="admin-heading">Meeting administration</h2></div>
+        {props.onClose && <button type="button" className="secondary-button" onClick={props.onClose}><X aria-hidden="true" size={16} /> Close administration</button>}
       </div>
       <MeetingBuilder
         groups={props.groups}
         meetings={props.meetings}
+        initialMeetingId={props.initialMeetingId}
+        initialMode={props.initialMode}
         onCreateMeeting={props.onCreateMeeting}
         onUpdateMeeting={props.onUpdateMeeting}
         onRegisterHistoricalMeeting={props.onRegisterHistoricalMeeting}
