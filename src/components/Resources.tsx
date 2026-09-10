@@ -6,11 +6,13 @@ import { validateMinutesFile } from '../uploadValidation'
 interface ResourcesProps {
   meeting?: Meeting
   isAdmin?: boolean
+  compact?: boolean
+  isPast?: boolean
   onUpload?: (file: File) => Promise<void>
   onDownload?: () => Promise<void>
 }
 
-export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: ResourcesProps) {
+export function Resources({ meeting, isAdmin = false, compact = false, isPast = false, onUpload, onDownload }: ResourcesProps) {
   const headingId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
@@ -32,23 +34,24 @@ export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: Re
       setMessage(error instanceof Error ? error.message : 'Upload failed.')
     } finally {
       setPending(false)
+      if (inputRef.current) inputRef.current.value = ''
     }
   }
 
   return (
-    <section className="resources-section" aria-labelledby={headingId}>
-      <div className="section-heading">
+    <section className={'resources-section' + (compact ? ' compact-minutes' : '')} aria-labelledby={headingId}>
+      {!compact && <div className="section-heading">
         <div>
           <p className="eyebrow">After the meeting</p>
-          <h2 id={headingId}>Meeting records</h2>
+          <h2>Meeting records</h2>
         </div>
-      </div>
+      </div>}
 
       <div className="minutes-row">
         <div className="resource-icon"><FileText aria-hidden="true" size={22} /></div>
         <div className="resource-copy">
-          <h3>Meeting minutes</h3>
-          <p>{meeting?.minutesFileName ?? 'Available after the meeting'}</p>
+          <h3 id={headingId}>Meeting minutes</h3>
+          <p>{meeting?.minutesFileName ?? (isPast ? 'Not uploaded yet' : 'Available after the meeting')}</p>
           {message && <p className="resource-message" role="status">{message}</p>}
         </div>
         <span className="admin-note"><LockKeyhole aria-hidden="true" size={15} /> Uploaded by admin</span>
@@ -58,7 +61,7 @@ export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: Re
               <Download aria-hidden="true" size={17} /> Download
             </button>
           )}
-          <input ref={inputRef} hidden type="file" accept=".pdf,.docx,.md" onChange={(event) => void handleFile(event.target.files?.[0])} />
+          <input ref={inputRef} aria-label="Meeting minutes file" hidden type="file" accept=".pdf,.docx,.md" onChange={(event) => void handleFile(event.target.files?.[0])} />
           {isAdmin && <button className="secondary-button" type="button" disabled={!onUpload || pending} onClick={() => inputRef.current?.click()}>
             <Upload aria-hidden="true" size={17} /> {pending ? 'Uploading...' : meeting?.minutesObjectPath ? 'Replace minutes' : 'Upload minutes'}
           </button>}

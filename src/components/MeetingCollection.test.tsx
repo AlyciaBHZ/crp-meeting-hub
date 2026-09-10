@@ -36,6 +36,50 @@ const callbacks = {
 }
 
 describe('MeetingCollection', () => {
+  it('orders archived meetings newest first and keeps minutes available on collapsed cards', async () => {
+    const older = { ...pastMeeting, id: 'older', date: '5 May 2026', dateISO: '2026-05-05', minutesFileName: undefined, minutesObjectPath: undefined }
+    const newer = { ...pastMeeting, id: 'newer', date: '5 Aug 2026', dateISO: '2026-08-05' }
+    const input = [older, newer]
+    render(<MeetingCollection {...callbacks} view="archive" meetings={input} profile={{ id: 'admin', role: 'admin' }} />)
+    const cards = screen.getAllByRole('article')
+    expect(within(cards[0]).getByText('5 Aug 2026')).toBeVisible()
+    expect(within(cards[1]).getByText('5 May 2026')).toBeVisible()
+    expect(input[0]).toBe(older)
+    expect(within(cards[0]).getByRole('button', { name: 'Collapse meeting' })).toHaveAttribute('aria-expanded', 'true')
+    expect(within(cards[1]).getByRole('button', { name: 'Expand meeting' })).toHaveAttribute('aria-expanded', 'false')
+    expect(within(cards[1]).queryByRole('region', { name: 'PDFs for Group 1' })).not.toBeInTheDocument()
+    expect(within(cards[1]).getByRole('button', { name: 'Upload minutes' })).toBeVisible()
+    expect(within(cards[1]).getByText('Not uploaded yet')).toBeVisible()
+    const minutes = new File(['minutes'], 'may-minutes.pdf', { type: 'application/pdf' })
+    await userEvent.upload(within(cards[1]).getByLabelText('Meeting minutes file'), minutes)
+    expect(callbacks.onUploadMinutes).toHaveBeenCalledWith(older, minutes)
+    expect(within(cards[0]).queryByText('Uploaded: may-minutes.pdf')).not.toBeInTheDocument()
+    await userEvent.click(within(cards[0]).getByRole('button', { name: 'Download' }))
+    expect(callbacks.onDownloadMinutes).toHaveBeenCalledWith(newer)
+  })
+
+  it('collapses from the bottom, restores focus, and preserves unfinished PDF input', async () => {
+    render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
+    await userEvent.type(screen.getByLabelText('Presenter / document name'), 'Draft update')
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse and back to meeting' }))
+    const toggle = screen.getByRole('button', { name: 'Expand meeting' })
+    expect(toggle).toHaveFocus()
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText('minutes.pdf')).toBeVisible()
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByLabelText('Presenter / document name')).toHaveValue('Draft update')
+    expect(screen.getByRole('region', { name: 'PDFs for Group 1' })).toBeVisible()
+  })
+
+  it('keeps collapse choices with their meetings when data refreshes or order changes', async () => {
+    const older = { ...pastMeeting, id: 'older', date: '5 May 2026', dateISO: '2026-05-05' }
+    const { rerender } = render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting, older]} profile={null} />)
+    const olderCard = screen.getByRole('article', { name: 'CRP Grant Meeting 5 May 2026' })
+    await userEvent.click(within(olderCard).getByRole('button', { name: 'Expand meeting' }))
+    rerender(<MeetingCollection {...callbacks} view="archive" meetings={[{ ...older, dateISO: '2026-07-05', date: '5 Jul 2026' }, pastMeeting]} profile={null} />)
+    expect(within(screen.getAllByRole('article')[0]).getByRole('button', { name: 'Collapse meeting' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('shows archived meetings without exposing their old Zoom links', () => {
     render(<MeetingCollection {...callbacks} view="archive" meetings={[pastMeeting]} profile={{ id: 'member-1', role: 'presenter' }} />)
 
