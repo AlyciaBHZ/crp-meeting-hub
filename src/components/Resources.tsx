@@ -51,7 +51,7 @@ export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: Re
           <p>{meeting?.minutesFileName ?? 'Available after the meeting'}</p>
           {message && <p className="resource-message" role="status">{message}</p>}
         </div>
-        <span className="admin-note"><LockKeyhole aria-hidden="true" size={15} /> Admin only</span>
+        <span className="admin-note"><LockKeyhole aria-hidden="true" size={15} /> Uploaded by admin</span>
         <div className="resource-actions">
           {meeting?.minutesObjectPath && onDownload && (
             <button className="secondary-button" type="button" onClick={() => void onDownload()}>
@@ -59,9 +59,9 @@ export function Resources({ meeting, isAdmin = false, onUpload, onDownload }: Re
             </button>
           )}
           <input ref={inputRef} hidden type="file" accept=".pdf,.docx,.md" onChange={(event) => void handleFile(event.target.files?.[0])} />
-          <button className="secondary-button" type="button" disabled={!isAdmin || !onUpload || pending} onClick={() => inputRef.current?.click()}>
-            <Upload aria-hidden="true" size={17} /> {pending ? 'Uploading...' : 'Upload minutes'}
-          </button>
+          {isAdmin && <button className="secondary-button" type="button" disabled={!onUpload || pending} onClick={() => inputRef.current?.click()}>
+            <Upload aria-hidden="true" size={17} /> {pending ? 'Uploading...' : meeting?.minutesObjectPath ? 'Replace minutes' : 'Upload minutes'}
+          </button>}
         </div>
       </div>
     </section>

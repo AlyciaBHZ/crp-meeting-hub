@@ -89,4 +89,14 @@ describe('SlideFilesControl', () => {
     expect(screen.getByRole('button', { name: 'Choose PDF' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Upload PDF' })).toBeDisabled()
   })
+
+  it('counts existing archive PDFs toward the same upload limit', () => {
+    render(<SlideFilesControl slot={{ ...slot, slideFiles: Array.from({ length: 19 }, (_, index) => slideFile(index)) }} archiveFiles={[{
+      id: 'legacy', meetingId: 'meeting', groupId: 'group-1', groupName: 'Group 1',
+      originalName: 'legacy.pdf', objectPath: 'legacy.pdf', sizeBytes: 100, uploadedAt: '2026-06-01',
+    }]} profile={{ id: 'member-1', role: 'presenter' }} enabled onUpload={vi.fn()} />)
+    expect(screen.getByText('20 / 20 PDFs')).toBeInTheDocument()
+    expect(screen.getByText('legacy.pdf')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload PDF' })).toBeDisabled()
+  })
 })

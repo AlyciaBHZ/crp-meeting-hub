@@ -4,6 +4,7 @@ import {
   buildAgendaDraft,
   classifyMeetingDate,
   getSingaporeTodayISO,
+  shiftAgendaStart,
   validateHistoricalMeetingDraft,
   validateMeetingDraft,
 } from './meetingLifecycle'
@@ -20,6 +21,19 @@ const meetingDetails = {
 }
 
 describe('meeting lifecycle', () => {
+  it('shifts a schedule earlier and rejects a shift across midnight without changing the draft', () => {
+    const slots = buildAgendaDraft(groups, '09:00')
+    expect(shiftAgendaStart(slots, '08:00').map((slot) => slot.startsAt)).toEqual(['08:00', '08:20'])
+    expect(() => shiftAgendaStart(slots, '23:40')).toThrow('same Singapore calendar day')
+    expect(slots[0].startsAt).toBe('09:00')
+  })
+
+  it('rejects incomplete times and an agenda whose times run backwards', () => {
+    const slots = buildAgendaDraft(groups, '09:00')
+    const draft = { ...meetingDetails, date: '2027-01-01', zoomUrl: 'https://zoom.us/j/123', slots }
+    expect(validateMeetingDraft({ ...draft, slots: [...slots].reverse() })).toBe('Agenda times must follow presentation order.')
+    expect(validateMeetingDraft({ ...draft, slots: [{ ...slots[0], startsAt: '' }] })).toBe('Enter a valid start and end time for every group.')
+  })
   it('classifies meetings from Singapore calendar dates', () => {
     expect(classifyMeetingDate('2026-08-13', '2026-08-14')).toBe('archive')
     expect(classifyMeetingDate('2026-08-14', '2026-08-14')).toBe('upcoming')

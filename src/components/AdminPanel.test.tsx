@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AdminPanel } from './AdminPanel'
@@ -25,6 +25,34 @@ const baseProps = {
 }
 
 describe('AdminPanel', () => {
+  it('opens the requested meeting and shifts every slot while preserving groups and breaks', async () => {
+    const onUpdateMeeting = vi.fn(() => Promise.resolve())
+    const meeting = {
+      id: 'meeting-1', title: 'CRP Meeting', dateISO: '2026-10-14', timezone: 'Asia/Singapore',
+      presentationMinutes: 15, qaMinutes: 5, zoomUrl: 'https://zoom.us/j/123',
+      slots: [
+        { id: 'slot-1', groupId: 'group-1', groupName: groups[0].name, startsAt: '09:00', endsAt: '09:20', slideStatus: 'uploaded' as const },
+        { id: 'slot-2', groupId: 'group-2', groupName: groups[1].name, startsAt: '09:30', endsAt: '09:50', slideStatus: 'awaiting' as const },
+      ],
+    }
+    render(<AdminPanel {...baseProps} meetings={[meeting]} initialMeetingId="meeting-1" onUpdateMeeting={onUpdateMeeting} />)
+    expect(screen.getByLabelText('Meeting title')).toHaveValue('CRP Meeting')
+    fireEvent.change(screen.getByLabelText('Meeting start (Singapore)'), { target: { value: '14:00' } })
+    fireEvent.change(screen.getByLabelText('Meeting date'), { target: { value: '2026-10-20' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Save meeting' }))
+    expect(onUpdateMeeting).toHaveBeenCalledWith('meeting-1', expect.objectContaining({ date: '2026-10-20', slots: [
+      expect.objectContaining({ id: 'slot-1', groupId: 'group-1', startsAt: '14:00', endsAt: '14:20' }),
+      expect.objectContaining({ id: 'slot-2', groupId: 'group-2', startsAt: '14:30', endsAt: '14:50' }),
+    ] }))
+  })
+
+  it('uses the chosen start time when adding groups to a new meeting', async () => {
+    render(<AdminPanel {...baseProps} />)
+    fireEvent.change(screen.getByLabelText('Meeting start (Singapore)'), { target: { value: '15:00' } })
+    await userEvent.click(screen.getByLabelText(`Select ${groups[0].name}`))
+    expect(screen.getByLabelText(`Start time for ${groups[0].name}`)).toHaveValue('15:00')
+    expect(screen.getByLabelText(`End time for ${groups[0].name}`)).toHaveValue('15:40')
+  })
   it('creates an online meeting from selected groups and proposed times', async () => {
     const onCreateMeeting = vi.fn(() => Promise.resolve())
     render(<AdminPanel {...baseProps} onCreateMeeting={onCreateMeeting} />)

@@ -1,6 +1,6 @@
 import { Download, FileText, Trash2, Upload } from 'lucide-react'
 import { type FormEvent, useId, useRef, useState } from 'react'
-import type { AgendaSlot, SlideFile } from '../data/meeting'
+import type { AgendaSlot, ArchiveLabFile, SlideFile } from '../data/meeting'
 import type { MemberProfile } from '../services/meetingAccess'
 import { MAX_SLIDE_FILES_PER_LAB, validateSlidePdf } from '../uploadValidation'
 
@@ -11,6 +11,8 @@ interface SlideFilesControlProps {
   onUpload?: (slot: AgendaSlot, displayName: string, file: File) => Promise<void>
   onDownload?: (file: SlideFile) => Promise<void>
   onRemove?: (file: SlideFile) => Promise<void>
+  archiveFiles?: ArchiveLabFile[]
+  onDownloadArchiveFile?: (file: ArchiveLabFile) => Promise<void>
 }
 
 function formatBytes(size: number) {
@@ -18,7 +20,7 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload, onRemove }: SlideFilesControlProps) {
+export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload, onRemove, archiveFiles = [], onDownloadArchiveFile }: SlideFilesControlProps) {
   const nameId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [displayName, setDisplayName] = useState('')
@@ -26,8 +28,10 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
-  const files = slot.slideFiles ?? []
-  const isFull = files.length >= MAX_SLIDE_FILES_PER_LAB
+  const files = profile ? slot.slideFiles ?? [] : []
+  const legacyFiles = profile ? archiveFiles : []
+  const fileCount = files.length + legacyFiles.length
+  const isFull = fileCount >= MAX_SLIDE_FILES_PER_LAB
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -36,7 +40,7 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
       setMessage('Please choose a PDF file.')
       return
     }
-    const validationError = validateSlidePdf(displayName, selectedFile, files.length)
+    const validationError = validateSlidePdf(displayName, selectedFile, fileCount)
     if (validationError) {
       setIsError(true)
       setMessage(validationError)
@@ -76,14 +80,26 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
     }
   }
 
+  async function download(action: () => Promise<void>) {
+    setMessage(null)
+    try {
+      await action()
+    } catch (error) {
+      setIsError(true)
+      setMessage(error instanceof Error ? error.message : 'Download failed. Please try again.')
+    }
+  }
+
   return (
-    <section className="slide-files-control" aria-label={`Slides for ${slot.groupName}`}>
+    <section className="slide-files-control" aria-label={`PDFs for ${slot.groupName}`}>
       <header className="slide-files-header">
-        <strong>Slides</strong>
-        <span>{files.length} / {MAX_SLIDE_FILES_PER_LAB} PDFs</span>
+        <strong>Group PDFs</strong>
+        {profile && <span>{fileCount} / {MAX_SLIDE_FILES_PER_LAB} PDFs</span>}
       </header>
 
-      {files.length > 0 && (
+      {!profile && <p className="pdf-help">Sign in to view and upload meeting PDFs.</p>}
+      {profile && fileCount === 0 && <p className="pdf-help">No PDFs uploaded yet.</p>}
+      {fileCount > 0 && (
         <ul className="slide-files-list">
           {files.map((file) => {
             const canRemove = Boolean(onRemove && profile && (profile.role === 'admin' || file.uploadedBy === profile.id))
@@ -91,11 +107,18 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
               <li key={file.id}>
                 <FileText aria-hidden="true" size={17} />
                 <span><strong>{file.displayName}</strong><small>{file.originalName} - {formatBytes(file.sizeBytes)}</small></span>
-                {onDownload && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.displayName}`} onClick={() => void onDownload(file)}><Download aria-hidden="true" size={16} /></button>}
+                {onDownload && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.displayName}`} onClick={() => void download(() => onDownload(file))}><Download aria-hidden="true" size={16} /></button>}
                 {canRemove && <button className="icon-button danger" type="button" title="Remove PDF" aria-label={`Remove ${file.displayName}`} disabled={pending} onClick={() => void remove(file)}><Trash2 aria-hidden="true" size={16} /></button>}
               </li>
             )
           })}
+          {legacyFiles.map((file) => (
+            <li key={`archive-${file.id}`}>
+              <FileText aria-hidden="true" size={17} />
+              <span><strong>{file.originalName}</strong><small>{formatBytes(file.sizeBytes)}</small></span>
+              {onDownloadArchiveFile && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.originalName}`} onClick={() => void download(() => onDownloadArchiveFile(file))}><Download aria-hidden="true" size={16} /></button>}
+            </li>
+          ))}
         </ul>
       )}
 
@@ -120,6 +143,8 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
           </button>
         </form>
       )}
+
+      {enabled && <p className="pdf-help">{isFull ? 'This group has reached its 20-PDF limit.' : 'PDFs up to 50 MB each. Upload before or after the meeting.'}</p>}
 
       {message && <p className={`slide-upload-message ${isError ? 'error' : ''}`} role={isError ? 'alert' : 'status'}>{message}</p>}
     </section>
