@@ -221,17 +221,22 @@ describe('meetingRepository', () => {
   })
 
   it('replaces meeting minutes metadata instead of creating duplicate records', async () => {
-    const upload = vi.fn(() => Promise.resolve({ data: { path: 'meeting-1/minutes' }, error: null }))
+    const upload = vi.fn((path: string) => Promise.resolve({ data: { path }, error: null }))
+    const remove = vi.fn().mockResolvedValue({ error: null })
     const upsert = vi.fn(() => Promise.resolve({ error: null }))
+    const chain = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: { object_path: 'meeting-1/minutes' }, error: null }), upsert }
+    chain.select.mockReturnValue(chain); chain.eq.mockReturnValue(chain)
     const repository = createMeetingRepository({
-      storage: { from: vi.fn(() => ({ upload })) },
-      from: vi.fn(() => ({ upsert })),
+      storage: { from: vi.fn(() => ({ upload, remove })) },
+      from: vi.fn(() => chain),
     } as never)
     const file = new File(['minutes'], 'minutes.pdf', { type: 'application/pdf' })
 
     await repository.uploadMinutes('meeting-1', 'admin-1', file)
 
-    expect(upload).toHaveBeenCalledWith('meeting-1/minutes', file, { upsert: true })
+    expect(upload).toHaveBeenCalledWith(expect.stringMatching(/^meeting-1\/[\da-f-]+\/minutes$/), file, { upsert: false })
+    expect(remove).toHaveBeenCalledWith(['meeting-1/minutes'])
+    expect(upsert.mock.invocationCallOrder[0]).toBeLessThan(remove.mock.invocationCallOrder[0])
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ meeting_id: 'meeting-1', kind: 'minutes' }), { onConflict: 'kind,resource_scope' })
   })
 

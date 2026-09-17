@@ -232,11 +232,19 @@ export default function App() {
             await loadMeetings()
           } : undefined}
           onUploadMinutes={isAdmin && repository && user ? async (meeting, file) => {
-            await repository.uploadMinutes(meeting.id, user.id, file)
-            await loadMeetings()
+            try { await repository.uploadMinutes(meeting.id, user.id, file) }
+            finally { await loadMeetings() }
           } : undefined}
           onDownloadMinutes={user && profile ? (meeting) => download('minutes', meeting.minutesObjectPath) : undefined}
           onDownloadArchiveFile={user && profile ? (_meeting, file: ArchiveLabFile) => download('archive-lab-files', file.objectPath) : undefined}
+          onRemoveArchiveFile={isAdmin && repository ? async (_meeting, file) => {
+            await repository.deleteArchiveLabFile(file)
+            await loadMeetings()
+          } : undefined}
+          onRemoveMinutes={isAdmin && repository ? async (meeting) => {
+            try { await repository.deleteMinutes(meeting) }
+            finally { await loadMeetings() }
+          } : undefined}
         />
 
         {isAdmin && repository && adminRequest && (

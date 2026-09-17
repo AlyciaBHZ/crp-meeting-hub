@@ -23,6 +23,8 @@ interface MeetingCollectionProps {
   onUploadMinutes?: (meeting: Meeting, file: File) => Promise<void>
   onDownloadMinutes?: (meeting: Meeting) => Promise<void>
   onDownloadArchiveFile?: (meeting: Meeting, file: ArchiveLabFile) => Promise<void>
+  onRemoveArchiveFile?: (meeting: Meeting, file: ArchiveLabFile) => Promise<void>
+  onRemoveMinutes?: (meeting: Meeting) => Promise<void>
   onCreateMeeting?: () => void
   onEditMeeting?: (meeting: Meeting) => void
   onManageGroups?: () => void
@@ -46,6 +48,7 @@ function MeetingCard({
   meeting, index, view, profile, onEditMeeting, onUploadSlides, onDownloadSlides,
   onRemoveSlides, onUploadMinutes, onDownloadMinutes, onDownloadArchiveFile,
   target, discussionRepository, onPreview,
+  onRemoveArchiveFile, onRemoveMinutes,
 }: MeetingCardProps) {
   const headingId = useId()
   const detailsId = useId()
@@ -108,6 +111,7 @@ function MeetingCard({
         isPast={view === 'archive'}
         isAdmin={isAdmin}
         onUpload={isAdmin && onUploadMinutes ? (file) => onUploadMinutes(meeting, file) : undefined}
+        onRemove={isAdmin && onRemoveMinutes ? () => onRemoveMinutes(meeting) : undefined}
         onDownload={profile && meeting.minutesObjectPath && onDownloadMinutes ? () => onDownloadMinutes(meeting) : undefined}
         onPreview={profile && onPreview && meeting.minutesObjectPath && meeting.minutesFileName?.toLowerCase().endsWith('.pdf') ? () => onPreview({ bucket: 'minutes', path: meeting.minutesObjectPath!, name: meeting.minutesFileName! }) : undefined}
       />
@@ -123,6 +127,7 @@ function MeetingCard({
           onDownload={profile && onDownloadSlides ? (file) => onDownloadSlides(meeting, file) : undefined}
           onRemove={profile && onRemoveSlides ? (file) => onRemoveSlides(meeting, file) : undefined}
           onDownloadArchiveFile={profile && onDownloadArchiveFile ? (file) => onDownloadArchiveFile(meeting, file) : undefined}
+          onRemoveArchiveFile={isAdmin && onRemoveArchiveFile ? (file) => onRemoveArchiveFile(meeting, file) : undefined}
         />
         <div className="meeting-collapse-footer">
           <button type="button" className="secondary-button" aria-expanded={expanded} aria-controls={detailsId} onClick={collapseFromBottom}>

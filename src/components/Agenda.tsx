@@ -26,9 +26,10 @@ interface AgendaProps {
   onDownload?: (file: SlideFile) => Promise<void>
   onRemove?: (file: SlideFile) => Promise<void>
   onDownloadArchiveFile?: (file: ArchiveLabFile) => Promise<void>
+  onRemoveArchiveFile?: (file: ArchiveLabFile) => Promise<void>
 }
 
-export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onDownload, onRemove, onDownloadArchiveFile, discussionRepository, onPreview }: AgendaProps) {
+export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onDownload, onRemove, onDownloadArchiveFile, onRemoveArchiveFile, discussionRepository, onPreview }: AgendaProps) {
   const headingId = useId()
   return (
     <section className="agenda-section" aria-labelledby={headingId}>
@@ -71,6 +72,7 @@ export function Agenda({ meeting, profile, canUpload = () => true, onUpload, onD
               onRemove={onRemove}
               archiveFiles={archiveFiles}
               onDownloadArchiveFile={onDownloadArchiveFile}
+              onRemoveArchiveFile={onRemoveArchiveFile}
               onPreview={onPreview}
             />
             {profile && discussionRepository && <Discussion key={profile.id + profile.role} slot={slot} archiveFiles={archiveFiles} profile={profile} repository={discussionRepository} onPreview={onPreview} />}

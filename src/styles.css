@@ -352,6 +352,7 @@ h1 { font-size: 3.5rem; line-height: 1.08; margin: 0; }
 .icon-button:hover { border-color: #0b7054; color: #0b7054; }
 .icon-button:disabled { color: #aeb6b2; }
 .icon-button.danger { color: #a23b2b; }
+.secondary-button.danger { color: #a23b2b; border-color: #c59a92; }
 .form-command-row { align-items: center; border-top: 1px solid #e3e7e4; display: flex; gap: 14px; padding: 18px 22px; }
 .form-command-row .member-message { grid-column: auto; }
 .add-group-form { align-items: end; background: white; border: 1px solid #dce2de; border-bottom: 0; display: grid; gap: 8px 12px; grid-template-columns: auto minmax(240px, 1fr) auto; padding: 18px 22px; }

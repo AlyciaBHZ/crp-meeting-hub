@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { HistoricalMeetingDraft, MeetingDraft, ResearchGroup, SlideFile } from '../data/meeting'
+import type { ArchiveLabFile, HistoricalMeetingDraft, Meeting, MeetingDraft, ResearchGroup, SlideFile } from '../data/meeting'
 import { mapCloudMeeting } from './meetingAccess'
 import { classifyMeetingDate } from './meetingLifecycle'
 
@@ -176,6 +176,28 @@ export function createMeetingRepository(client: SupabaseClient) {
       ensureNoError(metadataResult.error)
     },
 
+    async deleteArchiveLabFile(file: Pick<ArchiveLabFile, 'id' | 'objectPath'>) {
+      const result = await client.storage.from('archive-lab-files').remove([file.objectPath])
+      ensureNoError(result.error)
+      const metadata = await client.rpc('cancel_archive_lab_file', { file_id_input: file.id })
+      ensureNoError(metadata.error)
+    },
+
+    async deleteMinutes(meeting: Pick<Meeting, 'id' | 'minutesObjectPath'>) {
+      if (!meeting.minutesObjectPath) throw new Error('There are no minutes to delete.')
+      const current = await client.from('resources').select('object_path').eq('meeting_id', meeting.id).eq('kind', 'minutes').maybeSingle()
+      ensureNoError(current.error)
+      if (current.data && current.data.object_path !== meeting.minutesObjectPath) {
+        throw new Error('The minutes have changed. Refresh this meeting before deleting.')
+      }
+      const result = await client.storage.from('minutes').remove([meeting.minutesObjectPath])
+      ensureNoError(result.error)
+      const metadata = await client.rpc('cancel_meeting_minutes', {
+        meeting_id_input: meeting.id, object_path_input: meeting.minutesObjectPath,
+      })
+      ensureNoError(metadata.error)
+    },
+
     async getPdfBlob(bucket: 'slides' | 'minutes' | 'archive-lab-files', path: string) {
       const result = await client.storage.from(bucket).download(path)
       ensureNoError(result.error)
@@ -209,8 +231,11 @@ export function createMeetingRepository(client: SupabaseClient) {
     },
 
     async uploadMinutes(meetingId: string, userId: string, file: File) {
-      const path = `${meetingId}/minutes`
-      const uploadResult = await client.storage.from('minutes').upload(path, file, { upsert: true })
+      const previous = await client.from('resources').select('object_path').eq('meeting_id', meetingId).eq('kind', 'minutes').maybeSingle()
+      ensureNoError(previous.error)
+      // A new object key ensures a stale delete can never delete a replacement.
+      const path = `${meetingId}/${crypto.randomUUID()}/minutes`
+      const uploadResult = await client.storage.from('minutes').upload(path, file, { upsert: false })
       ensureNoError(uploadResult.error)
       const metadataResult = await client.from('resources').upsert(
         {
@@ -223,10 +248,19 @@ export function createMeetingRepository(client: SupabaseClient) {
           mime_type: file.type,
           size_bytes: file.size,
           uploaded_by: userId,
+          uploaded_at: new Date().toISOString(),
         },
         { onConflict: 'kind,resource_scope' },
       )
-      ensureNoError(metadataResult.error)
+      if (metadataResult.error) {
+        // A failed response may arrive after the server committed the update.
+        // Retain both objects rather than risk deleting the now-current file.
+        ensureNoError(metadataResult.error)
+      }
+      if (previous.data?.object_path) {
+        const cleanup = await client.storage.from('minutes').remove([previous.data.object_path])
+        if (cleanup.error) throw new Error('New minutes saved, but the previous file could not be removed from storage. Contact the administrator.')
+      }
       return requireData(uploadResult.data, 'The minutes upload returned no path.').path
     },
   }
