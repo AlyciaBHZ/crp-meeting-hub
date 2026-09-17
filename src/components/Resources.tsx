@@ -1,4 +1,4 @@
-import { Download, FileText, LockKeyhole, Upload } from 'lucide-react'
+import { Download, FileText, LockKeyhole, Trash2, Upload } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { Meeting } from '../data/meeting'
 import { validateMinutesFile } from '../uploadValidation'
@@ -11,13 +11,27 @@ interface ResourcesProps {
   onUpload?: (file: File) => Promise<void>
   onDownload?: () => Promise<void>
   onPreview?: () => void
+  onRemove?: () => Promise<void>
 }
 
-export function Resources({ meeting, isAdmin = false, compact = false, isPast = false, onUpload, onDownload, onPreview }: ResourcesProps) {
+export function Resources({ meeting, isAdmin = false, compact = false, isPast = false, onUpload, onDownload, onPreview, onRemove }: ResourcesProps) {
   const headingId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
+
+  async function remove() {
+    if (!isAdmin || !onRemove || !window.confirm(`Delete ${meeting?.minutesFileName ?? 'meeting minutes'} for ${meeting?.date ?? 'this meeting'}? This permanently deletes the file and cannot be undone.`)) return
+    setRemoving(true)
+    setMessage(null)
+    try {
+      await onRemove()
+      setMessage('Minutes deleted.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Delete failed. Please try again.')
+    } finally { setRemoving(false) }
+  }
 
   async function handleFile(file?: File) {
     if (!file || !onUpload) return
@@ -64,9 +78,10 @@ export function Resources({ meeting, isAdmin = false, compact = false, isPast = 
             </button>
           )}
           <input ref={inputRef} aria-label="Meeting minutes file" hidden type="file" accept=".pdf,.docx,.md" onChange={(event) => void handleFile(event.target.files?.[0])} />
-          {isAdmin && <button className="secondary-button" type="button" disabled={!onUpload || pending} onClick={() => inputRef.current?.click()}>
+          {isAdmin && <button className="secondary-button" type="button" disabled={!onUpload || pending || removing} onClick={() => inputRef.current?.click()}>
             <Upload aria-hidden="true" size={17} /> {pending ? 'Uploading...' : meeting?.minutesObjectPath ? 'Replace minutes' : 'Upload minutes'}
           </button>}
+          {isAdmin && meeting?.minutesObjectPath && onRemove && <button className="secondary-button danger" type="button" disabled={pending || removing} onClick={() => void remove()}><Trash2 aria-hidden="true" size={17} /> {removing ? 'Deleting minutes...' : 'Delete minutes'}</button>}
         </div>
       </div>
     </section>

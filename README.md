@@ -81,6 +81,10 @@ Administrators can also add or rename research groups, deactivate groups that ar
 
 ## Database Changes
 
+Administrators can use **Delete** beside any group PDF, including legacy Archive uploads, and **Delete minutes** in each meeting's minutes row (also available when collapsed). Confirmation identifies the file and warns that deletion is permanent. Deletion removes the private Storage object before releasing its metadata; failures remain visible and retryable. Discussion threads and their original PDF filename references are retained. Ordinary members do not receive legacy-PDF or minutes deletion rights; the existing named-slide uploader permissions remain in place.
+
+Minutes replacements use a new object path for each upload. A stale meeting card cannot delete a newer replacement; the page refreshes its minutes after a failed stale deletion. Replaced objects are removed only after the new minutes metadata is saved. Apply `20260917090000_admin_file_deletion.sql` before deploying these controls; it grants administrator Storage deletion for archive PDFs/minutes and guarded metadata cleanup. Applying the migration does not delete existing files.
+
 Versioned SQL migrations live in `supabase/migrations`. Local project-link data and administrator bootstrap values live under `supabase/.temp` and are ignored by Git.
 
 Apply `20260910090000_unified_meeting_pdfs.sql` before deploying the unified interface. It permits named PDF uploads after the meeting, counts existing Archive files toward the combined limit, and protects both file collections during schedule edits. PostgreSQL behavior tests use PGlite locally and do not write to the hosted database.

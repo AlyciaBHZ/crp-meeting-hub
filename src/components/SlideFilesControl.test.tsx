@@ -77,7 +77,7 @@ describe('SlideFilesControl', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Presenter 1' }))
 
-    expect(confirm).toHaveBeenCalledWith('Remove Presenter 1?')
+    expect(confirm).toHaveBeenCalledWith('Delete slides-1.pdf? This permanently deletes the file and cannot be undone. Existing discussions will be kept.')
     expect(onRemove).toHaveBeenCalledWith(file)
     expect(screen.getByText('PDF removed.')).toBeInTheDocument()
   })

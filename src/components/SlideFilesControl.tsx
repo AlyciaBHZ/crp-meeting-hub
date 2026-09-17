@@ -15,6 +15,7 @@ interface SlideFilesControlProps {
   onRemove?: (file: SlideFile) => Promise<void>
   archiveFiles?: ArchiveLabFile[]
   onDownloadArchiveFile?: (file: ArchiveLabFile) => Promise<void>
+  onRemoveArchiveFile?: (file: ArchiveLabFile) => Promise<void>
 }
 
 function formatBytes(size: number) {
@@ -22,7 +23,7 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload, onRemove, archiveFiles = [], onDownloadArchiveFile, onPreview }: SlideFilesControlProps) {
+export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload, onRemove, archiveFiles = [], onDownloadArchiveFile, onRemoveArchiveFile, onPreview }: SlideFilesControlProps) {
   const nameId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [displayName, setDisplayName] = useState('')
@@ -66,13 +67,13 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
     }
   }
 
-  async function remove(file: SlideFile) {
-    if (!onRemove || !window.confirm(`Remove ${file.displayName}?`)) return
+  async function remove(name: string, action: () => Promise<void>) {
+    if (!window.confirm(`Delete ${name}? This permanently deletes the file and cannot be undone. Existing discussions will be kept.`)) return
     setPending(true)
     setIsError(false)
     setMessage(null)
     try {
-      await onRemove(file)
+      await action()
       setMessage('PDF removed.')
     } catch (error) {
       setIsError(true)
@@ -111,7 +112,7 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
                 <span><strong>{file.displayName}</strong><small>{file.originalName} - {formatBytes(file.sizeBytes)}</small></span>
                 {onPreview && <button className="secondary-button" type="button" aria-label={`Preview ${file.displayName}`} onClick={() => onPreview({ bucket: 'slides', path: file.objectPath, name: file.originalName })}>Preview</button>}
                 {onDownload && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.displayName}`} onClick={() => void download(() => onDownload(file))}><Download aria-hidden="true" size={16} /></button>}
-                {canRemove && <button className="icon-button danger" type="button" title="Remove PDF" aria-label={`Remove ${file.displayName}`} disabled={pending} onClick={() => void remove(file)}><Trash2 aria-hidden="true" size={16} /></button>}
+                {canRemove && <button className="secondary-button danger" type="button" title="Delete PDF" aria-label={`Remove ${file.displayName}`} disabled={pending} onClick={() => void remove(file.originalName, () => onRemove!(file))}><Trash2 aria-hidden="true" size={16} /> Delete</button>}
               </li>
             )
           })}
@@ -121,6 +122,7 @@ export function SlideFilesControl({ slot, profile, enabled, onUpload, onDownload
               <span><strong>{file.originalName}</strong><small>{formatBytes(file.sizeBytes)}</small></span>
               {onPreview && <button className="secondary-button" type="button" aria-label={`Preview ${file.originalName}`} onClick={() => onPreview({ bucket: 'archive-lab-files', path: file.objectPath, name: file.originalName })}>Preview</button>}
               {onDownloadArchiveFile && <button className="icon-button" type="button" title="Download PDF" aria-label={`Download ${file.originalName}`} onClick={() => void download(() => onDownloadArchiveFile(file))}><Download aria-hidden="true" size={16} /></button>}
+              {profile?.role === 'admin' && onRemoveArchiveFile && <button className="secondary-button danger" type="button" aria-label={`Remove ${file.originalName}`} disabled={pending} onClick={() => void remove(file.originalName, () => onRemoveArchiveFile(file))}><Trash2 aria-hidden="true" size={16} /> Delete</button>}
             </li>
           ))}
         </ul>
